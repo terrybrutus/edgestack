@@ -13,6 +13,8 @@ const GamesPage = lazy(() => import("@/pages/GamesPage"));
 const InvestigationPage = lazy(() => import("@/pages/InvestigationPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const HistoryPageLazy = lazy(() => import("@/pages/HistoryPage"));
+const PlaysPage = lazy(() => import("@/pages/PlaysPage"));
+const MlbInvestigationPage = lazy(() => import("@/pages/MlbInvestigationPage"));
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -59,11 +61,25 @@ const historyRoute = createRoute({
   component: HistoryPageLazy,
 });
 
+const playsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/plays",
+  component: PlaysPage,
+});
+
+const mlbInvestigationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mlb/$gamePk",
+  component: MlbInvestigationPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   gameRoute,
   settingsRoute,
   historyRoute,
+  playsRoute,
+  mlbInvestigationRoute,
 ]);
 
 const router = createRouter({ routeTree });
