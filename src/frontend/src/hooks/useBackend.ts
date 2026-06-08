@@ -21,7 +21,19 @@ import {
   fetchSeasonAveragesForGame,
   fetchTeamLastNGames,
 } from "@/services/games-facade";
+import {
+  type MlbGame,
+  fetchBullpenUsage,
+  fetchMlbGamesForDate,
+  fetchMlbPitcherStats,
+  fetchUmpireForGame,
+  getParkFactor,
+  getUmpireTendency,
+  mlbDisplayTime,
+  mlbGameStatus,
+} from "@/services/mlb";
 import { fetchOdds } from "@/services/odds";
+import { fetchStadiumWeather } from "@/services/weather";
 import { getApiErrorMessage } from "@/types";
 import type {
   Game,
@@ -303,3 +315,115 @@ export function useApiStatus() {
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
+
+// ── MLB games ─────────────────────────────────────────────────────────────────
+
+export interface MlbGameCard {
+  gamePk: number;
+  status: "scheduled" | "inProgress" | "final";
+  displayTime: string;
+  homeTeam: { id: number; name: string; abbreviation: string };
+  awayTeam: { id: number; name: string; abbreviation: string };
+  homeScore?: number;
+  awayScore?: number;
+  homePitcher: { name: string; era: number | null } | null;
+  awayPitcher: { name: string; era: number | null } | null;
+  parkFactor: { runFactor: number; description: string };
+  weatherSignal: "OVER" | "UNDER" | "NEUTRAL";
+  weatherDescription: string;
+  venueId: number;
+  venueName: string;
+}
+
+export function useMlbGames(date?: string) {
+  return useQuery<MlbGameCard[]>({
+    queryKey: ["mlb-games", date ?? "today"],
+    queryFn: async () => {
+      const today =
+        date ??
+        new Date().toLocaleDateString("en-CA", {
+          timeZone: "America/New_York",
+        });
+      const games = await fetchMlbGamesForDate(today);
+      const cards = await Promise.all(
+        games.map(async (g: MlbGame): Promise<MlbGameCard> => {
+          const season = new Date(g.gameDate).getFullYear();
+          const venueId = g.venue.id;
+          const park = getParkFactor(venueId);
+          const [homePitcherStats, awayPitcherStats, weather] =
+            await Promise.allSettled([
+              g.teams.home.probablePitcher
+                ? fetchMlbPitcherStats(g.teams.home.probablePitcher.id, season)
+                : Promise.resolve(null),
+              g.teams.away.probablePitcher
+                ? fetchMlbPitcherStats(g.teams.away.probablePitcher.id, season)
+                : Promise.resolve(null),
+              fetchStadiumWeather(venueId, today),
+            ]);
+
+          const homeStats =
+            homePitcherStats.status === "fulfilled"
+              ? homePitcherStats.value
+              : null;
+          const awayStats =
+            awayPitcherStats.status === "fulfilled"
+              ? awayPitcherStats.value
+              : null;
+          const wx = weather.status === "fulfilled" ? weather.value : null;
+
+          return {
+            gamePk: g.gamePk,
+            status: mlbGameStatus(g),
+            displayTime: mlbDisplayTime(g),
+            homeTeam: {
+              id: g.teams.home.team.id,
+              name: g.teams.home.team.name,
+              abbreviation: g.teams.home.team.abbreviation,
+            },
+            awayTeam: {
+              id: g.teams.away.team.id,
+              name: g.teams.away.team.name,
+              abbreviation: g.teams.away.team.abbreviation,
+            },
+            homeScore: g.teams.home.score,
+            awayScore: g.teams.away.score,
+            homePitcher: g.teams.home.probablePitcher
+              ? {
+                  name: g.teams.home.probablePitcher.fullName,
+                  era: homeStats?.era ?? null,
+                }
+              : null,
+            awayPitcher: g.teams.away.probablePitcher
+              ? {
+                  name: g.teams.away.probablePitcher.fullName,
+                  era: awayStats?.era ?? null,
+                }
+              : null,
+            parkFactor: {
+              runFactor: park.runFactor,
+              description: park.description,
+            },
+            weatherSignal: wx?.totalSignal ?? "NEUTRAL",
+            weatherDescription: wx ? wx.description : "Weather unavailable",
+            venueId,
+            venueName: g.venue.name,
+          };
+        }),
+      );
+      return cards;
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    retry: 2,
+  });
+}
+
+// Re-export MLB types for pages
+export type { MlbGame };
+export {
+  fetchMlbGamesForDate,
+  getParkFactor,
+  getUmpireTendency,
+  fetchUmpireForGame,
+  fetchBullpenUsage,
+};

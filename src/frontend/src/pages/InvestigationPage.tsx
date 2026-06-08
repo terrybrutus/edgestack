@@ -34,11 +34,13 @@ import {
   ArrowLeft,
   BarChart3,
   Brain,
+  CheckCircle2,
   Clock,
   Flame,
   MapPin,
   RefreshCw,
   Swords,
+  Target,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -1146,12 +1148,295 @@ function AllOddsTab({
 }
 
 // ─── Edge Tab ─────────────────────────────────────────────────────────────────
+// ─── THE PLAY card ────────────────────────────────────────────────────────────
+interface ThePlayResult {
+  direction: string;
+  confidence: number;
+  convergenceCount: number;
+  betText: string;
+  summaryText: string;
+  signals: Array<{
+    name: string;
+    description: string;
+    confidence: number;
+    direction: string;
+  }>;
+}
+
+function computeThePlay(
+  investigation: GameInvestigation,
+): ThePlayResult | null {
+  const angles = investigation.situationalAngles;
+  if (!angles.length) return null;
+
+  const votes: Record<string, number> = {};
+  const confByDir: Record<string, number[]> = {};
+  for (const a of angles) {
+    const dir = String(a.edge);
+    votes[dir] = (votes[dir] ?? 0) + 1;
+    confByDir[dir] = [...(confByDir[dir] ?? []), Number(a.confidence)];
+  }
+
+  const sorted = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+  const [topDir, topCount] = sorted[0];
+  if (topCount < 2) return null;
+
+  const aligned = confByDir[topDir] ?? [];
+  const avgConf = aligned.reduce((a, b) => a + b, 0) / aligned.length;
+  const bonus = Math.min(20, (topCount - 1) * 7);
+  const confidence = Math.min(95, Math.round(avgConf + bonus));
+
+  const odds = investigation.odds[0];
+  const homeAbbr = investigation.game.homeTeam.abbreviation;
+  const awayAbbr = investigation.game.awayTeam.abbreviation;
+  const homeCity = investigation.game.homeTeam.city;
+  const awayCity = investigation.game.awayTeam.city;
+  const homeName =
+    homeCity &&
+    !investigation.game.homeTeam.name
+      .toLowerCase()
+      .startsWith(homeCity.toLowerCase())
+      ? `${homeCity} ${investigation.game.homeTeam.name}`
+      : investigation.game.homeTeam.name;
+  const awayName =
+    awayCity &&
+    !investigation.game.awayTeam.name
+      .toLowerCase()
+      .startsWith(awayCity.toLowerCase())
+      ? `${awayCity} ${investigation.game.awayTeam.name}`
+      : investigation.game.awayTeam.name;
+
+  let betText = "";
+  let summaryText = "";
+
+  if (topDir === "HOME") {
+    const spread = odds?.homeSpread;
+    betText =
+      spread != null
+        ? `${homeAbbr} ${spread > 0 ? "+" : ""}${spread}`
+        : `${homeAbbr} Moneyline`;
+    summaryText = `${topCount} signals converge on ${homeName} — take them ${spread != null ? `${spread > 0 ? "+" : ""}${spread}` : "ML"} on FanDuel.`;
+  } else if (topDir === "AWAY") {
+    const spread = odds?.awaySpread;
+    betText =
+      spread != null
+        ? `${awayAbbr} ${spread > 0 ? "+" : ""}${spread}`
+        : `${awayAbbr} Moneyline`;
+    summaryText = `${topCount} signals converge on ${awayName} — take them ${spread != null ? `${spread > 0 ? "+" : ""}${spread}` : "ML"} on FanDuel.`;
+  } else if (topDir === "OVER") {
+    const total = odds?.overUnder;
+    betText = total != null ? `Over ${total}` : "Over";
+    summaryText = `${topCount} signals point to a high-scoring game — bet Over${total != null ? ` ${total}` : ""} on FanDuel.`;
+  } else if (topDir === "UNDER") {
+    const total = odds?.overUnder;
+    betText = total != null ? `Under ${total}` : "Under";
+    summaryText = `${topCount} signals favor a low-scoring game — bet Under${total != null ? ` ${total}` : ""} on FanDuel.`;
+  }
+
+  const signals = angles
+    .filter((a) => String(a.edge) === topDir)
+    .map((a) => ({
+      name: a.name,
+      description: a.description,
+      confidence: Number(a.confidence),
+      direction: String(a.edge),
+    }));
+
+  return {
+    direction: topDir,
+    confidence,
+    convergenceCount: topCount,
+    betText,
+    summaryText,
+    signals,
+  };
+}
+
+function ThePlayCard({ investigation }: { investigation: GameInvestigation }) {
+  const play = computeThePlay(investigation);
+
+  if (!play) {
+    return (
+      <div
+        className="rounded-xl border border-border/40 bg-card/40 p-6 text-center space-y-2"
+        data-ocid="investigation.the_play.no_play"
+      >
+        <Target className="w-6 h-6 text-muted-foreground/30 mx-auto" />
+        <p className="text-sm font-body text-muted-foreground">
+          No strong convergent edge detected — insufficient aligned signals for
+          a confident play.
+        </p>
+        <p className="text-[10px] font-mono text-muted-foreground/60">
+          Signals need ≥2 aligned directions to generate a recommendation.
+        </p>
+      </div>
+    );
+  }
+
+  const isHighConv = play.confidence >= 75;
+  const isMedConv = play.confidence >= 60 && play.confidence < 75;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      data-ocid="investigation.the_play"
+    >
+      {/* Main play card */}
+      <div
+        className={cn(
+          "rounded-xl border overflow-hidden",
+          isHighConv
+            ? "border-primary/50 bg-primary/5 shadow-[0_0_30px_oklch(0.65_0.18_145_/_0.1)]"
+            : isMedConv
+              ? "border-accent/40 bg-accent/5"
+              : "border-border/60 bg-card",
+        )}
+      >
+        {/* Header */}
+        <div
+          className={cn(
+            "px-5 py-3 border-b flex items-center justify-between",
+            isHighConv
+              ? "border-primary/30"
+              : isMedConv
+                ? "border-accent/30"
+                : "border-border/40",
+          )}
+        >
+          <span
+            className={cn(
+              "text-[10px] font-mono uppercase tracking-[0.25em] font-bold flex items-center gap-1.5",
+              isHighConv
+                ? "text-primary"
+                : isMedConv
+                  ? "text-accent"
+                  : "text-muted-foreground",
+            )}
+          >
+            <Target className="w-3 h-3" />
+            The Play
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {play.convergenceCount} signals aligned
+            </span>
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-mono font-bold border",
+                isHighConv
+                  ? "border-primary/50 text-primary bg-primary/10"
+                  : isMedConv
+                    ? "border-accent/50 text-accent bg-accent/10"
+                    : "border-border/50 text-muted-foreground",
+              )}
+            >
+              {play.confidence}% conf
+            </span>
+          </div>
+        </div>
+
+        {/* Bet instruction */}
+        <div className="px-5 py-4 space-y-3">
+          <div className="space-y-1">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+              Recommended Bet · FanDuel
+            </p>
+            <p className="font-display text-2xl font-bold text-foreground tracking-tight">
+              {play.betText}
+            </p>
+            <p className="text-[10px] font-mono text-muted-foreground/70">
+              Standard -110 juice · confirm line on FanDuel before betting
+            </p>
+          </div>
+
+          <p className="text-sm font-body text-muted-foreground leading-relaxed border-l-2 border-primary/30 pl-3">
+            {play.summaryText}
+          </p>
+
+          {/* Confidence bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+              <span>Edge confidence</span>
+              <span>{play.confidence}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  isHighConv
+                    ? "bg-primary"
+                    : isMedConv
+                      ? "bg-accent"
+                      : "bg-muted-foreground/60",
+                )}
+                style={{ width: `${play.confidence}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Stacked signals */}
+        <div className="border-t border-border/30">
+          <div className="px-5 py-2.5 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3 h-3 text-primary/60" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Evidence Stack · {play.signals.length} factor
+              {play.signals.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="divide-y divide-border/20">
+            {play.signals.map((sig, i) => (
+              <div key={i} className="px-5 py-3 flex items-start gap-3">
+                <div
+                  className={cn(
+                    "mt-0.5 w-1.5 h-1.5 rounded-full shrink-0",
+                    sig.confidence >= 70
+                      ? "bg-primary"
+                      : sig.confidence >= 60
+                        ? "bg-accent"
+                        : "bg-muted-foreground/60",
+                  )}
+                />
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-mono font-semibold text-foreground">
+                      {sig.name}
+                    </p>
+                    <span className="shrink-0 text-[9px] font-mono text-muted-foreground">
+                      {sig.confidence}%
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-body text-muted-foreground leading-relaxed">
+                    {sig.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="px-5 py-2.5 bg-muted/20 border-t border-border/20">
+          <p className="text-[9px] font-mono text-muted-foreground/50 leading-relaxed">
+            EdgeStack surfaces data signals — not guaranteed outcomes. Bet
+            responsibly. All recommendations are informational only.
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
   const { lineMovement, restAdvantage, situationalAngles, refereeProfile } =
     investigation;
 
   return (
     <div className="space-y-5" data-ocid="investigation.edge_tab">
+      {/* THE PLAY */}
+      <ThePlayCard investigation={investigation} />
       {/* Line Movement */}
       {lineMovement ? (
         <div className="rounded-xl border border-border/60 bg-card overflow-hidden">

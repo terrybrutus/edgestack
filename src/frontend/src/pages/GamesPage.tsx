@@ -1,5 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTodayGames } from "@/hooks/useBackend";
+import {
+  type MlbGameCard as MlbGameCardData,
+  useMlbGames,
+  useTodayGames,
+} from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { formatMoneyline, formatSpread } from "@/types";
 import type { Game, GameStatus } from "@/types";
@@ -10,7 +14,10 @@ import {
   Calendar,
   ChevronRight,
   Clock,
+  CloudSun,
   RefreshCw,
+  TrendingDown,
+  TrendingUp,
   Trophy,
   Wifi,
 } from "lucide-react";
@@ -249,6 +256,227 @@ function GameCard({
   );
 }
 
+// ─── MLB Game Card ────────────────────────────────────────────────────────────
+function MlbGameCard({
+  game,
+  index,
+}: { game: MlbGameCardData; index: number }) {
+  const isLive = game.status === "inProgress";
+  const isFinal = game.status === "final";
+  const parkDev = game.parkFactor.runFactor - 100;
+  const hasWeatherSignal = game.weatherSignal !== "NEUTRAL";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: index * 0.06 }}
+    >
+      <div
+        className={cn(
+          "relative rounded-xl border bg-card overflow-hidden",
+          isLive
+            ? "border-primary/30 shadow-[0_0_20px_oklch(0.65_0.18_145_/_0.08)]"
+            : "border-border/50",
+        )}
+      >
+        {isLive && (
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-80" />
+        )}
+
+        <div className="p-4 space-y-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono uppercase tracking-widest",
+                isLive
+                  ? "border-primary/50 text-primary bg-primary/10"
+                  : isFinal
+                    ? "border-border/30 text-muted-foreground/70 bg-transparent"
+                    : "border-border/50 text-muted-foreground bg-muted/30",
+              )}
+            >
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  isLive
+                    ? "bg-primary animate-pulse"
+                    : isFinal
+                      ? "bg-muted-foreground/50"
+                      : "bg-muted-foreground",
+                )}
+              />
+              {isLive ? "Live" : isFinal ? "Final" : "Upcoming"}
+            </span>
+            <span className="text-[11px] font-mono font-semibold text-foreground/80">
+              {game.displayTime}
+            </span>
+          </div>
+
+          {/* Matchup */}
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
+                {game.awayTeam.abbreviation}
+              </span>
+              <span className="text-sm font-body text-muted-foreground truncate">
+                {game.awayTeam.name}
+              </span>
+              {(isLive || isFinal) && game.awayScore !== undefined && (
+                <span className="ml-auto font-display text-xl font-bold text-foreground">
+                  {game.awayScore}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border/30" />
+              <span className="text-[10px] font-mono text-muted-foreground/50 uppercase">
+                at
+              </span>
+              <div className="flex-1 h-px bg-border/30" />
+            </div>
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
+                {game.homeTeam.abbreviation}
+              </span>
+              <span className="text-sm font-body text-muted-foreground truncate">
+                {game.homeTeam.name}
+              </span>
+              {(isLive || isFinal) && game.homeScore !== undefined && (
+                <span className="ml-auto font-display text-xl font-bold text-foreground">
+                  {game.homeScore}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Pitchers */}
+          {(game.homePitcher || game.awayPitcher) && (
+            <div className="pt-2 border-t border-border/30 grid grid-cols-2 gap-2">
+              {[
+                { label: "Away SP", pitcher: game.awayPitcher },
+                { label: "Home SP", pitcher: game.homePitcher },
+              ].map(({ label, pitcher }) => (
+                <div key={label} className="space-y-0.5">
+                  <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                    {label}
+                  </p>
+                  {pitcher ? (
+                    <>
+                      <p className="text-[11px] font-mono text-foreground truncate">
+                        {pitcher.name}
+                      </p>
+                      <p className="text-[10px] font-mono text-muted-foreground/70">
+                        {pitcher.era != null
+                          ? `ERA ${pitcher.era.toFixed(2)}`
+                          : "ERA —"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[11px] font-mono text-muted-foreground/50">
+                      TBD
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Signals row */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {/* Park factor */}
+            {Math.abs(parkDev) >= 5 && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
+                  parkDev > 0
+                    ? "border-primary/40 text-primary bg-primary/5"
+                    : "border-chart-4/40 text-chart-4 bg-chart-4/5",
+                )}
+              >
+                {parkDev > 0 ? (
+                  <TrendingUp className="w-2.5 h-2.5" />
+                ) : (
+                  <TrendingDown className="w-2.5 h-2.5" />
+                )}
+                Park {parkDev > 0 ? "+" : ""}
+                {parkDev}
+              </span>
+            )}
+            {/* Weather signal */}
+            {hasWeatherSignal && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
+                  game.weatherSignal === "OVER"
+                    ? "border-primary/40 text-primary bg-primary/5"
+                    : "border-chart-4/40 text-chart-4 bg-chart-4/5",
+                )}
+              >
+                <CloudSun className="w-2.5 h-2.5" />
+                {game.weatherSignal === "OVER" ? "Weather ↑" : "Weather ↓"}
+              </span>
+            )}
+            {/* Venue */}
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono border border-border/30 text-muted-foreground/60">
+              {game.venueName}
+            </span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── MLB Games Section ────────────────────────────────────────────────────────
+function MlbGamesSection() {
+  const { data: games, isLoading, isError, error, refetch } = useMlbGames();
+
+  if (isLoading) return <LoadingSkeleton />;
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4">
+        <AlertCircle className="w-8 h-8 text-destructive" />
+        <p className="text-sm font-mono text-muted-foreground">
+          {error instanceof Error ? error.message : "Could not load MLB games"}
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-primary/40 text-primary text-xs font-mono"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!games?.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-3">
+        <Trophy className="w-8 h-8 text-muted-foreground/30" />
+        <p className="font-display text-lg font-semibold text-foreground">
+          No MLB Games Today
+        </p>
+        <p className="text-sm font-body text-muted-foreground">
+          Check back on the next game day.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {games.map((game, i) => (
+        <MlbGameCard key={game.gamePk} game={game} index={i} />
+      ))}
+    </div>
+  );
+}
+
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 function LoadingSkeleton() {
   return (
@@ -314,6 +542,7 @@ function RefreshIndicator({ dataUpdatedAt }: { dataUpdatedAt: number }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function GamesPage() {
   const queryClient = useQueryClient();
+  const [sport, setSport] = useState<"nba" | "mlb">("nba");
   const {
     data: gamesResponse,
     isLoading,
@@ -393,7 +622,7 @@ export default function GamesPage() {
             <div className="flex items-center gap-2 mb-1.5">
               <Trophy className="w-3.5 h-3.5 text-primary" />
               <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-primary font-semibold">
-                NBA Playoffs
+                {sport === "nba" ? "NBA" : "MLB"}
               </span>
               <span className="w-1 h-1 rounded-full bg-border/60" />
               <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
@@ -401,12 +630,14 @@ export default function GamesPage() {
               </span>
             </div>
             <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
-              {pageTitle}
+              {sport === "mlb" ? "MLB Games" : pageTitle}
             </h1>
             <p className="text-sm font-body text-muted-foreground mt-0.5">
-              {isLocallyUpcoming
-                ? `Next slate: ${formatGamesDate(gamesDate)}`
-                : "Select a game to open the investigation room"}
+              {sport === "mlb"
+                ? "Pitcher matchups · park factors · weather signals"
+                : isLocallyUpcoming
+                  ? `Next slate: ${formatGamesDate(gamesDate)}`
+                  : "Select a game to open the investigation room"}
             </p>
           </div>
 
@@ -432,6 +663,31 @@ export default function GamesPage() {
             </button>
           </div>
         </motion.div>
+
+        {/* Sport switcher */}
+        <div className="mt-4 flex gap-1 border-b border-border/40">
+          {(["nba", "mlb"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSport(s)}
+              className={cn(
+                "relative px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors",
+                sport === s
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s}
+              {sport === s && (
+                <motion.div
+                  layoutId="sport-tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"
+                />
+              )}
+            </button>
+          ))}
+        </div>
 
         {devDebug}
 
@@ -460,11 +716,15 @@ export default function GamesPage() {
         <div className="mt-4 h-px bg-gradient-to-r from-primary/30 via-border/40 to-transparent" />
       </div>
 
+      {/* MLB view */}
+      {sport === "mlb" && <MlbGamesSection />}
+
+      {/* NBA view */}
       {/* Loading */}
-      {isLoading && <LoadingSkeleton />}
+      {sport === "nba" && isLoading && <LoadingSkeleton />}
 
       {/* Error — genuine API failure only */}
-      {isError && (
+      {sport === "nba" && isError && (
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -498,7 +758,8 @@ export default function GamesPage() {
       )}
 
       {/* Empty — no games found */}
-      {!isLoading &&
+      {sport === "nba" &&
+        !isLoading &&
         !isError &&
         sortedGames.length === 0 &&
         !isUpcomingDate && (
@@ -548,7 +809,7 @@ export default function GamesPage() {
         )}
 
       {/* Games grid */}
-      {!isLoading && sortedGames.length > 0 && (
+      {sport === "nba" && !isLoading && sortedGames.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sortedGames.map((game, i) => (
             <GameCard
