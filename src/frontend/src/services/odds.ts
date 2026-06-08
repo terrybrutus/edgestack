@@ -80,8 +80,12 @@ export function parseOddsEvent(event: OddsEvent): ParsedOdds {
       }
       if (market.key === "totals" && total === null) {
         for (const o of market.outcomes) {
-          if (o.name === "Over") { total = o.point ?? null; overOdds = o.price; }
-          else { underOdds = o.price; }
+          if (o.name === "Over") {
+            total = o.point ?? null;
+            overOdds = o.price;
+          } else {
+            underOdds = o.price;
+          }
         }
       }
       if (market.key === "h2h" && homeML === null) {
@@ -94,7 +98,17 @@ export function parseOddsEvent(event: OddsEvent): ParsedOdds {
     if (homeSpread !== null && total !== null && homeML !== null) break;
   }
 
-  return { homeSpread, awaySpread, homeSpreadOdds, awaySpreadOdds, total, overOdds, underOdds, homeML, awayML };
+  return {
+    homeSpread,
+    awaySpread,
+    homeSpreadOdds,
+    awaySpreadOdds,
+    total,
+    overOdds,
+    underOdds,
+    homeML,
+    awayML,
+  };
 }
 
 export function formatAmerican(odds: number | null): string {

@@ -1174,16 +1174,37 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-mono text-muted-foreground/60">
-                  Open: {lineMovement.openingSpread !== undefined && lineMovement.openingSpread !== null ? (lineMovement.openingSpread > 0 ? `+${lineMovement.openingSpread}` : String(lineMovement.openingSpread)) : "—"}
+                  Open:{" "}
+                  {lineMovement.openingSpread !== undefined &&
+                  lineMovement.openingSpread !== null
+                    ? lineMovement.openingSpread > 0
+                      ? `+${lineMovement.openingSpread}`
+                      : String(lineMovement.openingSpread)
+                    : "—"}
                 </span>
-                <span className="text-[10px] font-mono text-muted-foreground">→</span>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  →
+                </span>
                 <span className="text-sm font-mono font-semibold text-foreground">
-                  {lineMovement.currentSpread !== undefined && lineMovement.currentSpread !== null ? (lineMovement.currentSpread > 0 ? `+${lineMovement.currentSpread}` : String(lineMovement.currentSpread)) : "—"}
+                  {lineMovement.currentSpread !== undefined &&
+                  lineMovement.currentSpread !== null
+                    ? lineMovement.currentSpread > 0
+                      ? `+${lineMovement.currentSpread}`
+                      : String(lineMovement.currentSpread)
+                    : "—"}
                 </span>
               </div>
               {lineMovement.spreadMove !== 0 && (
-                <p className={cn("text-[10px] font-mono", lineMovement.spreadMove < 0 ? "text-primary" : "text-destructive")}>
-                  {lineMovement.spreadMove > 0 ? "+" : ""}{lineMovement.spreadMove.toFixed(1)} pts moved
+                <p
+                  className={cn(
+                    "text-[10px] font-mono",
+                    lineMovement.spreadMove < 0
+                      ? "text-primary"
+                      : "text-destructive",
+                  )}
+                >
+                  {lineMovement.spreadMove > 0 ? "+" : ""}
+                  {lineMovement.spreadMove.toFixed(1)} pts moved
                 </p>
               )}
             </div>
@@ -1193,16 +1214,33 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-mono text-muted-foreground/60">
-                  Open: {lineMovement.openingTotal !== undefined && lineMovement.openingTotal !== null ? lineMovement.openingTotal : "—"}
+                  Open:{" "}
+                  {lineMovement.openingTotal !== undefined &&
+                  lineMovement.openingTotal !== null
+                    ? lineMovement.openingTotal
+                    : "—"}
                 </span>
-                <span className="text-[10px] font-mono text-muted-foreground">→</span>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  →
+                </span>
                 <span className="text-sm font-mono font-semibold text-foreground">
-                  {lineMovement.currentTotal !== undefined && lineMovement.currentTotal !== null ? lineMovement.currentTotal : "—"}
+                  {lineMovement.currentTotal !== undefined &&
+                  lineMovement.currentTotal !== null
+                    ? lineMovement.currentTotal
+                    : "—"}
                 </span>
               </div>
               {lineMovement.totalMove !== 0 && (
-                <p className={cn("text-[10px] font-mono", lineMovement.totalMove > 0 ? "text-primary" : "text-destructive")}>
-                  {lineMovement.totalMove > 0 ? "+" : ""}{lineMovement.totalMove.toFixed(1)} pts moved
+                <p
+                  className={cn(
+                    "text-[10px] font-mono",
+                    lineMovement.totalMove > 0
+                      ? "text-primary"
+                      : "text-destructive",
+                  )}
+                >
+                  {lineMovement.totalMove > 0 ? "+" : ""}
+                  {lineMovement.totalMove.toFixed(1)} pts moved
                 </p>
               )}
             </div>
@@ -1245,7 +1283,9 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
                 <p className="text-2xl font-display font-bold text-foreground">
                   {String(restAdvantage.awayRestDays)}
                 </p>
-                <p className="text-[9px] font-mono text-muted-foreground">days</p>
+                <p className="text-[9px] font-mono text-muted-foreground">
+                  days
+                </p>
               </div>
               <div className="flex flex-col items-center justify-center">
                 <Badge
@@ -1259,7 +1299,9 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
                         : "border-border/40 text-muted-foreground",
                   )}
                 >
-                  {restAdvantage.advantage === "NONE" ? "Even" : `${restAdvantage.advantage} Edge`}
+                  {restAdvantage.advantage === "NONE"
+                    ? "Even"
+                    : `${restAdvantage.advantage} Edge`}
                 </Badge>
               </div>
               <div>
@@ -1269,7 +1311,9 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
                 <p className="text-2xl font-display font-bold text-foreground">
                   {String(restAdvantage.homeRestDays)}
                 </p>
-                <p className="text-[9px] font-mono text-muted-foreground">days</p>
+                <p className="text-[9px] font-mono text-muted-foreground">
+                  days
+                </p>
               </div>
             </div>
             <p className="text-xs font-body text-muted-foreground leading-relaxed">
@@ -1324,36 +1368,46 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
               {refereeProfile.name}
             </p>
             <div className="grid grid-cols-3 gap-3 text-center">
-              {refereeProfile.avgFoulsPerGame !== undefined && refereeProfile.avgFoulsPerGame !== null && (
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-                    Fouls/Game
-                  </p>
-                  <p className="text-lg font-display font-bold text-foreground">
-                    {refereeProfile.avgFoulsPerGame.toFixed(1)}
-                  </p>
-                </div>
-              )}
-              {refereeProfile.avgFreeThrowsPerGame !== undefined && refereeProfile.avgFreeThrowsPerGame !== null && (
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-                    FT/Game
-                  </p>
-                  <p className="text-lg font-display font-bold text-foreground">
-                    {refereeProfile.avgFreeThrowsPerGame.toFixed(1)}
-                  </p>
-                </div>
-              )}
-              {refereeProfile.overRate !== undefined && refereeProfile.overRate !== null && (
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-                    Over Rate
-                  </p>
-                  <p className={cn("text-lg font-display font-bold", refereeProfile.overRate >= 0.52 ? "text-primary" : "text-muted-foreground")}>
-                    {(refereeProfile.overRate * 100).toFixed(0)}%
-                  </p>
-                </div>
-              )}
+              {refereeProfile.avgFoulsPerGame !== undefined &&
+                refereeProfile.avgFoulsPerGame !== null && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                      Fouls/Game
+                    </p>
+                    <p className="text-lg font-display font-bold text-foreground">
+                      {refereeProfile.avgFoulsPerGame.toFixed(1)}
+                    </p>
+                  </div>
+                )}
+              {refereeProfile.avgFreeThrowsPerGame !== undefined &&
+                refereeProfile.avgFreeThrowsPerGame !== null && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                      FT/Game
+                    </p>
+                    <p className="text-lg font-display font-bold text-foreground">
+                      {refereeProfile.avgFreeThrowsPerGame.toFixed(1)}
+                    </p>
+                  </div>
+                )}
+              {refereeProfile.overRate !== undefined &&
+                refereeProfile.overRate !== null && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2 space-y-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                      Over Rate
+                    </p>
+                    <p
+                      className={cn(
+                        "text-lg font-display font-bold",
+                        refereeProfile.overRate >= 0.52
+                          ? "text-primary"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {(refereeProfile.overRate * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                )}
             </div>
             <p className="text-xs font-body text-muted-foreground leading-relaxed">
               {refereeProfile.tendency}
@@ -1362,14 +1416,17 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
         </div>
       ) : null}
 
-      {!lineMovement && !restAdvantage && situationalAngles.length === 0 && !refereeProfile && (
-        <div className="rounded-xl border border-border/40 bg-card/40 p-8 text-center space-y-2">
-          <Zap className="w-6 h-6 text-muted-foreground/30 mx-auto" />
-          <p className="text-sm font-body text-muted-foreground">
-            Edge data loads when the game investigation runs with live odds.
-          </p>
-        </div>
-      )}
+      {!lineMovement &&
+        !restAdvantage &&
+        situationalAngles.length === 0 &&
+        !refereeProfile && (
+          <div className="rounded-xl border border-border/40 bg-card/40 p-8 text-center space-y-2">
+            <Zap className="w-6 h-6 text-muted-foreground/30 mx-auto" />
+            <p className="text-sm font-body text-muted-foreground">
+              Edge data loads when the game investigation runs with live odds.
+            </p>
+          </div>
+        )}
     </div>
   );
 }

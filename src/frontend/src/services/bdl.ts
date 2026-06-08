@@ -126,7 +126,8 @@ export function parseBdlStatus(
   const s = status.toLowerCase();
   if (s === "final" || s.startsWith("final")) return "final";
   if (s.includes("t") && s.includes("z") && s.length >= 19) return "scheduled"; // ISO UTC
-  if (s.includes("halftime") || s.match(/^\d+:\d+\s*(q\d|ot)/i)) return "inProgress";
+  if (s.includes("halftime") || s.match(/^\d+:\d+\s*(q\d|ot)/i))
+    return "inProgress";
   if (s.match(/^q\d|^\d+(st|nd|rd|th)/i)) return "inProgress";
   return "scheduled";
 }
@@ -151,7 +152,10 @@ export function bdlStatusToDisplayTime(status: string): string {
 }
 
 // BDL ISO UTC timestamp → "YYYY-MM-DD" in ET
-export function bdlStatusToEtDate(status: string, fallbackDate: string): string {
+export function bdlStatusToEtDate(
+  status: string,
+  fallbackDate: string,
+): string {
   if (status.includes("T") && status.includes("Z") && status.length >= 19) {
     const d = new Date(status);
     if (!Number.isNaN(d.getTime())) {
