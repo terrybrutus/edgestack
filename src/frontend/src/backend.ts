@@ -417,7 +417,7 @@ export interface backendInterface {
     getApiStatus(): Promise<ApiStatus>;
     getBetHistory(): Promise<Array<BetRecommendation>>;
     getBetHistoryStats(): Promise<BetHistoryStats>;
-    getOpeningLine(gameId: string): Promise<string | undefined>;
+    getOpeningLine(gameId: string): Promise<string | null>;
     recordOpeningLine(gameId: string, spread: string, total: string, homeML: string): Promise<void>;
     saveBetRecommendation(rec: BetRecommendation): Promise<Result_1>;
     updateBetOutcome(id: string, status: BetStatus, gameResult: string | null): Promise<Result>;
