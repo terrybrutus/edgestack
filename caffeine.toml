@@ -1,8 +1,8 @@
 manifest_version = "0.1.0"
 
 [project]
-id = "my-app"
-name = "my-app"
+id = "edgestack"
+name = "edgestack"
 
 [workspace]
 include = ["src/**"]
