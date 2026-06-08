@@ -11,24 +11,54 @@ export interface GameWeather {
   totalImpact: string;
 }
 
-// MLB stadium coordinates for weather lookup
-const STADIUM_COORDS: Record<
-  number,
-  { lat: number; lon: number; name: string; cfDeg: number }
-> = {
-  2: { lat: 39.756, lon: -104.994, name: "Coors Field", cfDeg: 180 }, // CF faces south
-  15: { lat: 39.097, lon: -84.507, name: "GABP", cfDeg: 200 },
-  4: { lat: 42.346, lon: -71.097, name: "Fenway Park", cfDeg: 90 },
-  10: { lat: 41.948, lon: -87.655, name: "Wrigley Field", cfDeg: 90 }, // wind from lake = east
-  22: { lat: 32.707, lon: -117.157, name: "Petco Park", cfDeg: 315 },
-  31: { lat: 37.778, lon: -122.389, name: "Oracle Park", cfDeg: 270 },
-  7: { lat: 34.074, lon: -118.24, name: "Dodger Stadium", cfDeg: 270 },
-  32: { lat: 47.591, lon: -122.332, name: "T-Mobile Park", cfDeg: 270 },
-  3: { lat: 42.339, lon: -83.049, name: "Comerica Park", cfDeg: 0 },
-  5: { lat: 41.83, lon: -87.634, name: "Guaranteed Rate Field", cfDeg: 180 },
-  680: { lat: 29.757, lon: -95.355, name: "Minute Maid Park", cfDeg: 0 }, // retractable roof
-  1: { lat: 39.284, lon: -76.622, name: "Oriole Park", cfDeg: 315 },
-};
+// MLB stadium coordinates keyed by partial venue name (lowercase match).
+// Using names avoids relying on MLB Stats API venue IDs which are undocumented.
+const STADIUM_COORDS: Array<{
+  match: string; // substring of venue.name (lowercase)
+  lat: number;
+  lon: number;
+  cfDeg: number;
+  indoor?: boolean; // retractable roofs / domes → weather irrelevant
+}> = [
+  { match: "coors", lat: 39.756, lon: -104.994, cfDeg: 180 },
+  { match: "great american", lat: 39.097, lon: -84.507, cfDeg: 200 },
+  { match: "fenway", lat: 42.346, lon: -71.097, cfDeg: 90 },
+  { match: "wrigley", lat: 41.948, lon: -87.655, cfDeg: 90 },
+  { match: "petco", lat: 32.707, lon: -117.157, cfDeg: 315 },
+  { match: "oracle", lat: 37.778, lon: -122.389, cfDeg: 270 },
+  { match: "dodger", lat: 34.074, lon: -118.24, cfDeg: 270 },
+  { match: "t-mobile", lat: 47.591, lon: -122.332, cfDeg: 270 },
+  { match: "comerica", lat: 42.339, lon: -83.049, cfDeg: 0 },
+  { match: "guaranteed rate", lat: 41.83, lon: -87.634, cfDeg: 180 },
+  { match: "minute maid", lat: 29.757, lon: -95.355, cfDeg: 0, indoor: true },
+  { match: "camden yards", lat: 39.284, lon: -76.622, cfDeg: 315 },
+  { match: "oriole park", lat: 39.284, lon: -76.622, cfDeg: 315 },
+  { match: "yankee", lat: 40.829, lon: -73.926, cfDeg: 0 },
+  { match: "progressive", lat: 41.496, lon: -81.685, cfDeg: 180 },
+  { match: "pnc park", lat: 40.447, lon: -80.006, cfDeg: 90 },
+  { match: "busch", lat: 38.623, lon: -90.193, cfDeg: 90 },
+  { match: "kauffman", lat: 39.052, lon: -94.48, cfDeg: 0 },
+  { match: "target field", lat: 44.982, lon: -93.278, cfDeg: 270 },
+  { match: "american family", lat: 43.028, lon: -87.971, cfDeg: 180 },
+  { match: "globe life", lat: 32.751, lon: -97.083, cfDeg: 0, indoor: true },
+  {
+    match: "american league",
+    lat: 25.778,
+    lon: -80.22,
+    cfDeg: 0,
+    indoor: true,
+  }, // loanDepot
+  { match: "loandepot", lat: 25.778, lon: -80.22, cfDeg: 0, indoor: true },
+  { match: "tropicana", lat: 27.768, lon: -82.653, cfDeg: 0, indoor: true },
+  { match: "chase field", lat: 33.446, lon: -112.067, cfDeg: 0, indoor: true },
+  { match: "sutter health", lat: 38.586, lon: -121.5, cfDeg: 270 },
+  { match: "oakland", lat: 37.752, lon: -122.201, cfDeg: 270 },
+  { match: "citizens bank", lat: 39.906, lon: -75.166, cfDeg: 0 },
+  { match: "truist park", lat: 33.891, lon: -84.468, cfDeg: 90 },
+  { match: "rogers centre", lat: 43.641, lon: -79.389, cfDeg: 0, indoor: true },
+  { match: "nationals park", lat: 38.873, lon: -77.007, cfDeg: 0 },
+  { match: "citi field", lat: 40.757, lon: -73.846, cfDeg: 270 },
+];
 
 const DIR_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
@@ -37,11 +67,13 @@ function degToDir(deg: number): string {
 }
 
 export async function fetchStadiumWeather(
-  venueId: number,
+  venueName: string,
   date: string, // "YYYY-MM-DD"
 ): Promise<GameWeather | null> {
-  const stadium = STADIUM_COORDS[venueId];
+  const lower = venueName.toLowerCase();
+  const stadium = STADIUM_COORDS.find((s) => lower.includes(s.match));
   if (!stadium) return null;
+  if (stadium.indoor) return null; // indoor/retractable dome — weather irrelevant
 
   const url = `${CONFIG.WEATHER_BASE}/forecast?latitude=${stadium.lat}&longitude=${stadium.lon}&daily=precipitation_probability_max,windspeed_10m_max,winddirection_10m_dominant,temperature_2m_max&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FNew_York&start_date=${date}&end_date=${date}`;
 

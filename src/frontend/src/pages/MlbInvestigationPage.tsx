@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMlbGames } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowLeft,
@@ -57,6 +57,7 @@ function LoadingSkeleton() {
 
 export default function MlbInvestigationPage() {
   const { gamePk } = useParams({ from: "/mlb/$gamePk" });
+  const navigate = useNavigate();
   const { data: games, isLoading, isError } = useMlbGames();
 
   if (isLoading) return <LoadingSkeleton />;
@@ -188,13 +189,16 @@ export default function MlbInvestigationPage() {
         transition={{ duration: 0.25 }}
         className="mb-5"
       >
-        <Link
-          to="/"
+        <button
+          type="button"
+          onClick={() =>
+            navigate({ to: "/", search: { sport: "mlb" } as never })
+          }
           className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-[11px] font-mono uppercase tracking-widest transition-colors"
         >
           <ArrowLeft className="w-3 h-3" />
           All Games
-        </Link>
+        </button>
       </motion.div>
 
       {/* Game header */}
