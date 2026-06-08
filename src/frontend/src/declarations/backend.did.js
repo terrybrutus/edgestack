@@ -8,36 +8,140 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const ItemStatus = IDL.Variant({ 'done' : IDL.Null, 'todo' : IDL.Null });
-export const Item = IDL.Record({
-  'id' : IDL.Nat,
-  'status' : ItemStatus,
-  'title' : IDL.Text,
+export const ApiStatus = IDL.Record({
+  'lastBdlCallStatus' : IDL.Opt(IDL.Text),
+  'oddsApiConfigured' : IDL.Bool,
+  'openAiConfigured' : IDL.Bool,
+  'bdlApiConfigured' : IDL.Bool,
+  'lastOddsApiCallStatus' : IDL.Opt(IDL.Text),
 });
+export const BetStatus = IDL.Variant({
+  'won' : IDL.Null,
+  'cancelled' : IDL.Null,
+  'pending' : IDL.Null,
+  'lost' : IDL.Null,
+  'push' : IDL.Null,
+});
+export const BetType = IDL.Variant({
+  'gameTotal' : IDL.Null,
+  'playerProp' : IDL.Null,
+  'spread' : IDL.Null,
+});
+export const GameId = IDL.Text;
+export const BetRecommendation = IDL.Record({
+  'id' : IDL.Text,
+  'status' : BetStatus,
+  'result' : IDL.Opt(IDL.Text),
+  'homeTeam' : IDL.Text,
+  'gameResult' : IDL.Opt(IDL.Text),
+  'betType' : BetType,
+  'gameId' : GameId,
+  'description' : IDL.Text,
+  'reasoning' : IDL.Text,
+  'updatedAt' : IDL.Opt(IDL.Int),
+  'recommendedAt' : IDL.Int,
+  'awayTeam' : IDL.Text,
+  'gameDate' : IDL.Text,
+  'preGameOdds' : IDL.Opt(IDL.Text),
+  'confidence' : IDL.Nat,
+  'closingLine' : IDL.Opt(IDL.Text),
+  'clvScore' : IDL.Opt(IDL.Float64),
+});
+export const BetHistoryStats = IDL.Record({
+  'lostBets' : IDL.Nat,
+  'wonBets' : IDL.Nat,
+  'totalBets' : IDL.Nat,
+  'pendingBets' : IDL.Nat,
+  'winRate' : IDL.Float64,
+});
+export const ApiError = IDL.Variant({
+  'networkError' : IDL.Text,
+  'notFound' : IDL.Text,
+  'parseError' : IDL.Text,
+  'rateLimited' : IDL.Text,
+  'unavailable' : IDL.Text,
+});
+export const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : ApiError });
+export const Result = IDL.Variant({ 'ok' : IDL.Bool, 'err' : ApiError });
 
 export const idlService = IDL.Service({
-  'createItem' : IDL.Func([IDL.Text], [IDL.Nat], []),
-  'deleteItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-  'getItems' : IDL.Func([], [IDL.Vec(Item)], ['query']),
-  'updateItem' : IDL.Func([IDL.Nat, IDL.Text, ItemStatus], [IDL.Bool], []),
+  'getApiStatus'          : IDL.Func([], [ApiStatus], ['query']),
+  'getBetHistory'         : IDL.Func([], [IDL.Vec(BetRecommendation)], ['query']),
+  'getBetHistoryStats'    : IDL.Func([], [BetHistoryStats], ['query']),
+  'getOpeningLine'        : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+  'recordOpeningLine'     : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [], []),
+  'saveBetRecommendation' : IDL.Func([BetRecommendation], [Result_1], []),
+  'updateBetOutcome'      : IDL.Func([IDL.Text, BetStatus, IDL.Opt(IDL.Text)], [Result], []),
+  'updateClosingLine'     : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [Result], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const ItemStatus = IDL.Variant({ 'done' : IDL.Null, 'todo' : IDL.Null });
-  const Item = IDL.Record({
-    'id' : IDL.Nat,
-    'status' : ItemStatus,
-    'title' : IDL.Text,
+  const ApiStatus = IDL.Record({
+    'lastBdlCallStatus' : IDL.Opt(IDL.Text),
+    'oddsApiConfigured' : IDL.Bool,
+    'openAiConfigured' : IDL.Bool,
+    'bdlApiConfigured' : IDL.Bool,
+    'lastOddsApiCallStatus' : IDL.Opt(IDL.Text),
   });
-  
+  const BetStatus = IDL.Variant({
+    'won' : IDL.Null,
+    'cancelled' : IDL.Null,
+    'pending' : IDL.Null,
+    'lost' : IDL.Null,
+    'push' : IDL.Null,
+  });
+  const BetType = IDL.Variant({
+    'gameTotal' : IDL.Null,
+    'playerProp' : IDL.Null,
+    'spread' : IDL.Null,
+  });
+  const GameId = IDL.Text;
+  const BetRecommendation = IDL.Record({
+    'id' : IDL.Text,
+    'status' : BetStatus,
+    'result' : IDL.Opt(IDL.Text),
+    'homeTeam' : IDL.Text,
+    'gameResult' : IDL.Opt(IDL.Text),
+    'betType' : BetType,
+    'gameId' : GameId,
+    'description' : IDL.Text,
+    'reasoning' : IDL.Text,
+    'updatedAt' : IDL.Opt(IDL.Int),
+    'recommendedAt' : IDL.Int,
+    'awayTeam' : IDL.Text,
+    'gameDate' : IDL.Text,
+    'preGameOdds' : IDL.Opt(IDL.Text),
+    'confidence' : IDL.Nat,
+    'closingLine' : IDL.Opt(IDL.Text),
+    'clvScore' : IDL.Opt(IDL.Float64),
+  });
+  const BetHistoryStats = IDL.Record({
+    'lostBets' : IDL.Nat,
+    'wonBets' : IDL.Nat,
+    'totalBets' : IDL.Nat,
+    'pendingBets' : IDL.Nat,
+    'winRate' : IDL.Float64,
+  });
+  const ApiError = IDL.Variant({
+    'networkError' : IDL.Text,
+    'notFound' : IDL.Text,
+    'parseError' : IDL.Text,
+    'rateLimited' : IDL.Text,
+    'unavailable' : IDL.Text,
+  });
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : ApiError });
+  const Result = IDL.Variant({ 'ok' : IDL.Bool, 'err' : ApiError });
+
   return IDL.Service({
-    'createItem' : IDL.Func([IDL.Text], [IDL.Nat], []),
-    'deleteItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-    'getItems' : IDL.Func([], [IDL.Vec(Item)], ['query']),
-    'updateItem' : IDL.Func([IDL.Nat, IDL.Text, ItemStatus], [IDL.Bool], []),
+    'getApiStatus'          : IDL.Func([], [ApiStatus], ['query']),
+    'getBetHistory'         : IDL.Func([], [IDL.Vec(BetRecommendation)], ['query']),
+    'getBetHistoryStats'    : IDL.Func([], [BetHistoryStats], ['query']),
+    'getOpeningLine'        : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+    'recordOpeningLine'     : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [], []),
+    'saveBetRecommendation' : IDL.Func([BetRecommendation], [Result_1], []),
+    'updateBetOutcome'      : IDL.Func([IDL.Text, BetStatus, IDL.Opt(IDL.Text)], [Result], []),
+    'updateClosingLine'     : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [Result], []),
   });
 };
-
-export const init = ({ IDL }) => { return []; };

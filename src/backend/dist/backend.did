@@ -1,17 +1,78 @@
-type ItemStatus = 
+type ApiError =
  variant {
-   done;
-   todo;
+   networkError: text;
+   notFound: text;
+   parseError: text;
+   rateLimited: text;
+   unavailable: text;
  };
-type Item = 
+type ApiStatus =
  record {
-   id: nat;
-   status: ItemStatus;
-   title: text;
+   bdlApiConfigured: bool;
+   lastBdlCallStatus: opt text;
+   lastOddsApiCallStatus: opt text;
+   oddsApiConfigured: bool;
+   openAiConfigured: bool;
+ };
+type BetHistoryStats =
+ record {
+   lostBets: nat;
+   pendingBets: nat;
+   totalBets: nat;
+   winRate: float64;
+   wonBets: nat;
+ };
+type BetRecommendation =
+ record {
+   awayTeam: text;
+   betType: BetType;
+   clvScore: opt float64;
+   closingLine: opt text;
+   confidence: nat;
+   description: text;
+   gameDate: text;
+   gameId: text;
+   gameResult: opt text;
+   homeTeam: text;
+   id: text;
+   preGameOdds: opt text;
+   reasoning: text;
+   recommendedAt: int;
+   result: opt text;
+   status: BetStatus;
+   updatedAt: opt int;
+ };
+type BetStatus =
+ variant {
+   cancelled;
+   lost;
+   pending;
+   push;
+   won;
+ };
+type BetType =
+ variant {
+   gameTotal;
+   playerProp;
+   spread;
+ };
+type Result =
+ variant {
+   err: ApiError;
+   ok: bool;
+ };
+type Result_1 =
+ variant {
+   err: ApiError;
+   ok: text;
  };
 service : {
-  createItem: (title: text) -> (nat);
-  deleteItem: (id: nat) -> (bool);
-  getItems: () -> (vec Item) query;
-  updateItem: (id: nat, title: text, status: ItemStatus) -> (bool);
+  getApiStatus: () -> (ApiStatus) query;
+  getBetHistory: () -> (vec BetRecommendation) query;
+  getBetHistoryStats: () -> (BetHistoryStats) query;
+  getOpeningLine: (text) -> (opt text) query;
+  recordOpeningLine: (text, text, text, text) -> ();
+  saveBetRecommendation: (BetRecommendation) -> (Result_1);
+  updateBetOutcome: (text, BetStatus, opt text) -> (Result);
+  updateClosingLine: (text, text, text) -> (Result);
 }

@@ -10,14 +10,66 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface Item { 'id' : bigint, 'status' : ItemStatus, 'title' : string }
-export type ItemStatus = { 'done' : null } |
-  { 'todo' : null };
+export type ApiError = { 'networkError' : string } |
+  { 'notFound' : string } |
+  { 'parseError' : string } |
+  { 'rateLimited' : string } |
+  { 'unavailable' : string };
+export interface ApiStatus {
+  'lastBdlCallStatus' : [] | [string],
+  'oddsApiConfigured' : boolean,
+  'openAiConfigured' : boolean,
+  'bdlApiConfigured' : boolean,
+  'lastOddsApiCallStatus' : [] | [string],
+}
+export interface BetHistoryStats {
+  'lostBets' : bigint,
+  'wonBets' : bigint,
+  'totalBets' : bigint,
+  'pendingBets' : bigint,
+  'winRate' : number,
+}
+export interface BetRecommendation {
+  'id' : string,
+  'status' : BetStatus,
+  'result' : [] | [string],
+  'homeTeam' : string,
+  'gameResult' : [] | [string],
+  'betType' : BetType,
+  'gameId' : GameId,
+  'description' : string,
+  'reasoning' : string,
+  'updatedAt' : [] | [bigint],
+  'recommendedAt' : bigint,
+  'awayTeam' : string,
+  'gameDate' : string,
+  'preGameOdds' : [] | [string],
+  'confidence' : bigint,
+  'closingLine' : [] | [string],
+  'clvScore' : [] | [number],
+}
+export type BetStatus = { 'won' : null } |
+  { 'cancelled' : null } |
+  { 'pending' : null } |
+  { 'lost' : null } |
+  { 'push' : null };
+export type BetType = { 'gameTotal' : null } |
+  { 'playerProp' : null } |
+  { 'spread' : null };
+export type GameId = string;
+export type Result = { 'ok' : boolean } |
+  { 'err' : ApiError };
+export type Result_1 = { 'ok' : string } |
+  { 'err' : ApiError };
 export interface _SERVICE {
-  'createItem' : ActorMethod<[string], bigint>,
-  'deleteItem' : ActorMethod<[bigint], boolean>,
-  'getItems' : ActorMethod<[], Array<Item>>,
-  'updateItem' : ActorMethod<[bigint, string, ItemStatus], boolean>,
+  'getApiStatus' : ActorMethod<[], ApiStatus>,
+  'getBetHistory' : ActorMethod<[], Array<BetRecommendation>>,
+  'getBetHistoryStats' : ActorMethod<[], BetHistoryStats>,
+  'getOpeningLine' : ActorMethod<[string], [] | [string]>,
+  'recordOpeningLine' : ActorMethod<[string, string, string, string], undefined>,
+  'saveBetRecommendation' : ActorMethod<[BetRecommendation], Result_1>,
+  'updateBetOutcome' : ActorMethod<[string, BetStatus, [] | [string]], Result>,
+  'updateClosingLine' : ActorMethod<[string, string, string], Result>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
