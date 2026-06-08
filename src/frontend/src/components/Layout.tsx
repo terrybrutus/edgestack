@@ -6,7 +6,13 @@ import {
 } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { Activity, BookOpen, Settings, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  Crosshair,
+  Settings,
+  TrendingUp,
+} from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -88,6 +94,18 @@ export function Layout({ children, className }: LayoutProps) {
               </div>
             </div>
 
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 font-mono text-[10px] uppercase tracking-widest"
+              asChild
+              data-ocid="nav.plays_button"
+            >
+              <Link to="/plays">
+                <Crosshair className="w-3.5 h-3.5" />
+                Plays
+              </Link>
+            </Button>
             <Button
               variant="ghost"
               size="sm"

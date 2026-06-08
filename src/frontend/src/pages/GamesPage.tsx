@@ -272,159 +272,176 @@ function MlbGameCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: index * 0.06 }}
     >
-      <div
-        className={cn(
-          "relative rounded-xl border bg-card overflow-hidden",
-          isLive
-            ? "border-primary/30 shadow-[0_0_20px_oklch(0.65_0.18_145_/_0.08)]"
-            : "border-border/50",
-        )}
+      <Link
+        to="/mlb/$gamePk"
+        params={{ gamePk: String(game.gamePk) }}
+        className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
       >
-        {isLive && (
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-80" />
-        )}
-
-        <div className="p-4 space-y-3">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono uppercase tracking-widest",
-                isLive
-                  ? "border-primary/50 text-primary bg-primary/10"
-                  : isFinal
-                    ? "border-border/30 text-muted-foreground/70 bg-transparent"
-                    : "border-border/50 text-muted-foreground bg-muted/30",
-              )}
-            >
-              <span
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full",
-                  isLive
-                    ? "bg-primary animate-pulse"
-                    : isFinal
-                      ? "bg-muted-foreground/50"
-                      : "bg-muted-foreground",
-                )}
-              />
-              {isLive ? "Live" : isFinal ? "Final" : "Upcoming"}
-            </span>
-            <span className="text-[11px] font-mono font-semibold text-foreground/80">
-              {game.displayTime}
-            </span>
-          </div>
-
-          {/* Matchup */}
-          <div className="space-y-1.5">
-            <div className="flex items-baseline gap-2.5">
-              <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
-                {game.awayTeam.abbreviation}
-              </span>
-              <span className="text-sm font-body text-muted-foreground truncate">
-                {game.awayTeam.name}
-              </span>
-              {(isLive || isFinal) && game.awayScore !== undefined && (
-                <span className="ml-auto font-display text-xl font-bold text-foreground">
-                  {game.awayScore}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px bg-border/30" />
-              <span className="text-[10px] font-mono text-muted-foreground/50 uppercase">
-                at
-              </span>
-              <div className="flex-1 h-px bg-border/30" />
-            </div>
-            <div className="flex items-baseline gap-2.5">
-              <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
-                {game.homeTeam.abbreviation}
-              </span>
-              <span className="text-sm font-body text-muted-foreground truncate">
-                {game.homeTeam.name}
-              </span>
-              {(isLive || isFinal) && game.homeScore !== undefined && (
-                <span className="ml-auto font-display text-xl font-bold text-foreground">
-                  {game.homeScore}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Pitchers */}
-          {(game.homePitcher || game.awayPitcher) && (
-            <div className="pt-2 border-t border-border/30 grid grid-cols-2 gap-2">
-              {[
-                { label: "Away SP", pitcher: game.awayPitcher },
-                { label: "Home SP", pitcher: game.homePitcher },
-              ].map(({ label, pitcher }) => (
-                <div key={label} className="space-y-0.5">
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-                    {label}
-                  </p>
-                  {pitcher ? (
-                    <>
-                      <p className="text-[11px] font-mono text-foreground truncate">
-                        {pitcher.name}
-                      </p>
-                      <p className="text-[10px] font-mono text-muted-foreground/70">
-                        {pitcher.era != null
-                          ? `ERA ${pitcher.era.toFixed(2)}`
-                          : "ERA —"}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[11px] font-mono text-muted-foreground/50">
-                      TBD
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
+        <div
+          className={cn(
+            "relative rounded-xl border bg-card overflow-hidden cursor-pointer",
+            "transition-all duration-200",
+            isLive
+              ? "border-primary/30 shadow-[0_0_20px_oklch(0.65_0.18_145_/_0.08)] group-hover:border-primary/60"
+              : "border-border/50 group-hover:border-primary/35 group-hover:bg-card/90",
+          )}
+        >
+          {isLive && (
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-80" />
           )}
 
-          {/* Signals row */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {/* Park factor */}
-            {Math.abs(parkDev) >= 5 && (
+          <div className="p-4 space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
-                  parkDev > 0
-                    ? "border-primary/40 text-primary bg-primary/5"
-                    : "border-chart-4/40 text-chart-4 bg-chart-4/5",
+                  "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono uppercase tracking-widest",
+                  isLive
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : isFinal
+                      ? "border-border/30 text-muted-foreground/70 bg-transparent"
+                      : "border-border/50 text-muted-foreground bg-muted/30",
                 )}
               >
-                {parkDev > 0 ? (
-                  <TrendingUp className="w-2.5 h-2.5" />
-                ) : (
-                  <TrendingDown className="w-2.5 h-2.5" />
-                )}
-                Park {parkDev > 0 ? "+" : ""}
-                {parkDev}
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    isLive
+                      ? "bg-primary animate-pulse"
+                      : isFinal
+                        ? "bg-muted-foreground/50"
+                        : "bg-muted-foreground",
+                  )}
+                />
+                {isLive ? "Live" : isFinal ? "Final" : "Upcoming"}
               </span>
-            )}
-            {/* Weather signal */}
-            {hasWeatherSignal && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
-                  game.weatherSignal === "OVER"
-                    ? "border-primary/40 text-primary bg-primary/5"
-                    : "border-chart-4/40 text-chart-4 bg-chart-4/5",
-                )}
-              >
-                <CloudSun className="w-2.5 h-2.5" />
-                {game.weatherSignal === "OVER" ? "Weather ↑" : "Weather ↓"}
+              <span className="text-[11px] font-mono font-semibold text-foreground/80">
+                {game.displayTime}
               </span>
+            </div>
+
+            {/* Matchup */}
+            <div className="space-y-1.5">
+              <div className="flex items-baseline gap-2.5">
+                <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
+                  {game.awayTeam.abbreviation}
+                </span>
+                <span className="text-sm font-body text-muted-foreground truncate">
+                  {game.awayTeam.name}
+                </span>
+                {(isLive || isFinal) && game.awayScore !== undefined && (
+                  <span className="ml-auto font-display text-xl font-bold text-foreground">
+                    {game.awayScore}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-border/30" />
+                <span className="text-[10px] font-mono text-muted-foreground/50 uppercase">
+                  at
+                </span>
+                <div className="flex-1 h-px bg-border/30" />
+              </div>
+              <div className="flex items-baseline gap-2.5">
+                <span className="font-display text-[22px] font-bold text-foreground tracking-tight leading-none">
+                  {game.homeTeam.abbreviation}
+                </span>
+                <span className="text-sm font-body text-muted-foreground truncate">
+                  {game.homeTeam.name}
+                </span>
+                {(isLive || isFinal) && game.homeScore !== undefined && (
+                  <span className="ml-auto font-display text-xl font-bold text-foreground">
+                    {game.homeScore}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Pitchers */}
+            {(game.homePitcher || game.awayPitcher) && (
+              <div className="pt-2 border-t border-border/30 grid grid-cols-2 gap-2">
+                {[
+                  { label: "Away SP", pitcher: game.awayPitcher },
+                  { label: "Home SP", pitcher: game.homePitcher },
+                ].map(({ label, pitcher }) => (
+                  <div key={label} className="space-y-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+                      {label}
+                    </p>
+                    {pitcher ? (
+                      <>
+                        <p className="text-[11px] font-mono text-foreground truncate">
+                          {pitcher.name}
+                        </p>
+                        <p className="text-[10px] font-mono text-muted-foreground/70">
+                          {pitcher.era != null
+                            ? `ERA ${pitcher.era.toFixed(2)}`
+                            : "ERA —"}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] font-mono text-muted-foreground/50">
+                        TBD
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
-            {/* Venue */}
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono border border-border/30 text-muted-foreground/60">
-              {game.venueName}
+
+            {/* Signals row */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {/* Park factor */}
+              {Math.abs(parkDev) >= 5 && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
+                    parkDev > 0
+                      ? "border-primary/40 text-primary bg-primary/5"
+                      : "border-chart-4/40 text-chart-4 bg-chart-4/5",
+                  )}
+                >
+                  {parkDev > 0 ? (
+                    <TrendingUp className="w-2.5 h-2.5" />
+                  ) : (
+                    <TrendingDown className="w-2.5 h-2.5" />
+                  )}
+                  Park {parkDev > 0 ? "+" : ""}
+                  {parkDev}
+                </span>
+              )}
+              {/* Weather signal */}
+              {hasWeatherSignal && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border",
+                    game.weatherSignal === "OVER"
+                      ? "border-primary/40 text-primary bg-primary/5"
+                      : "border-chart-4/40 text-chart-4 bg-chart-4/5",
+                  )}
+                >
+                  <CloudSun className="w-2.5 h-2.5" />
+                  {game.weatherSignal === "OVER" ? "Weather ↑" : "Weather ↓"}
+                </span>
+              )}
+              {/* Venue */}
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono border border-border/30 text-muted-foreground/60">
+                {game.venueName}
+              </span>
+            </div>
+          </div>
+          {/* Hover CTA footer */}
+          <div className="px-4 py-2 border-t border-border/20 bg-muted/10 flex items-center justify-between">
+            <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
+              MLB · {game.venueName}
+            </span>
+            <span className="text-[9px] font-mono text-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+              Investigate
+              <ChevronRight className="w-2.5 h-2.5" />
             </span>
           </div>
         </div>
-      </div>
+      </Link>
     </motion.div>
   );
 }
