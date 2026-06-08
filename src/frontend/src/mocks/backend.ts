@@ -21,7 +21,7 @@ export const mockBackend: backendInterface = {
     winRate: 0,
   }),
 
-  getOpeningLine: async (_gameId: string) => undefined,
+  getOpeningLine: async (_gameId: string) => null,
 
   recordOpeningLine: async (
     _gameId: string,
