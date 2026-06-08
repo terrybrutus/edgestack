@@ -1,0 +1,19 @@
+{
+  "overview": "EdgeStack is a minimal full-stack item tracker with a Motoko backend and React/TypeScript frontend.",
+  "features": [
+    "Create, view, update, and delete items",
+    "Toggle item status between todo and done",
+    "Clean dark-themed UI with real-time state from the canister",
+    "Shared global item list accessible without login"
+  ],
+  "category": "task-tracker",
+  "tags": [
+    "motoko",
+    "react",
+    "typescript",
+    "crud",
+    "minimal",
+    "state-only"
+  ],
+  "last_updated": "2026-06-08T02:53:19.434Z"
+}

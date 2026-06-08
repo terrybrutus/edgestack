@@ -1,0 +1,17 @@
+type ItemStatus = 
+ variant {
+   done;
+   todo;
+ };
+type Item = 
+ record {
+   id: nat;
+   status: ItemStatus;
+   title: text;
+ };
+service : {
+  createItem: (title: text) -> (nat);
+  deleteItem: (id: nat) -> (bool);
+  getItems: () -> (vec Item) query;
+  updateItem: (id: nat, title: text, status: ItemStatus) -> (bool);
+}

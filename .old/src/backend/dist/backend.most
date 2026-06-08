@@ -1,0 +1,29 @@
+// Version: 4.0.0
+type ItemStatus__226049467 = {#done; #todo};
+type Item__531123396 =
+  {id : Nat; status : ItemStatus__226049467; title : Text};
+type Item__881430528 = {id : Nat; status : {#done; #todo}; title : Text};
+type List__529703492<T> =
+  {
+    var blockIndex : Nat__1040412405;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__1040412405
+  };
+type List__560604548<T> = List__529703492<T>;
+type Nat__1040412405 = Nat__920180692;
+type Nat__920180692 = Nat;
+type NewActor__1055556513 =
+  {items : List__560604548<Item__881430528>; state : {var nextId : Nat}};
+type OldActor__541293704 = {};
+{
+  "20260608_000000_Init" : OldActor__541293704 -> NewActor__1055556513
+}
+actor  {
+  stable items :
+    {
+      var blockIndex : Nat__1040412405;
+      var blocks : [var [var ?Item__531123396]];
+      var elementIndex : Nat__1040412405
+    };
+  stable state : {var nextId : Nat}
+};
