@@ -345,7 +345,6 @@ export interface MlbGameCard {
   parkFactor: { runFactor: number; description: string };
   weatherSignal: "OVER" | "UNDER" | "NEUTRAL";
   weatherDescription: string;
-  venueId: number;
   venueName: string;
 }
 
@@ -362,8 +361,8 @@ export function useMlbGames(date?: string) {
       const cards = await Promise.all(
         games.map(async (g: MlbGame): Promise<MlbGameCard> => {
           const season = new Date(g.gameDate).getFullYear();
-          const venueId = g.venue.id;
-          const park = getParkFactor(venueId);
+          const venueName = g.venue.name;
+          const park = getParkFactor(venueName);
           const [homePitcherStats, awayPitcherStats, weather] =
             await Promise.allSettled([
               g.teams.home.probablePitcher
@@ -372,7 +371,7 @@ export function useMlbGames(date?: string) {
               g.teams.away.probablePitcher
                 ? fetchMlbPitcherStats(g.teams.away.probablePitcher.id, season)
                 : Promise.resolve(null),
-              fetchStadiumWeather(venueId, today),
+              fetchStadiumWeather(venueName, today),
             ]);
 
           const homeStats =
@@ -419,7 +418,6 @@ export function useMlbGames(date?: string) {
             },
             weatherSignal: wx?.totalSignal ?? "NEUTRAL",
             weatherDescription: wx ? wx.description : "Weather unavailable",
-            venueId,
             venueName: g.venue.name,
           };
         }),
@@ -602,8 +600,8 @@ export function usePlays() {
       await Promise.all(
         mlbGamesRaw.map(async (g) => {
           const season = new Date(g.gameDate).getFullYear();
-          const venueId = g.venue.id;
-          const park = getPF(venueId);
+          const venueName = g.venue.name;
+          const park = getPF(venueName);
           const [homePitcherStats, awayPitcherStats, wx] =
             await Promise.allSettled([
               g.teams.home.probablePitcher
@@ -612,7 +610,7 @@ export function usePlays() {
               g.teams.away.probablePitcher
                 ? fetchPStats(g.teams.away.probablePitcher.id, season)
                 : Promise.resolve(null),
-              fetchStadiumWeather(venueId, today),
+              fetchStadiumWeather(venueName, today),
             ]);
 
           const homeEra =

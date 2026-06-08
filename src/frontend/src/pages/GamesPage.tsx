@@ -8,7 +8,7 @@ import { cn, teamFullName } from "@/lib/utils";
 import { formatMoneyline, formatSpread } from "@/types";
 import type { Game, GameStatus } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import {
   AlertCircle,
   Calendar,
@@ -552,7 +552,10 @@ function RefreshIndicator({ dataUpdatedAt }: { dataUpdatedAt: number }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function GamesPage() {
   const queryClient = useQueryClient();
-  const [sport, setSport] = useState<"nba" | "mlb">("nba");
+  const search = useSearch({ strict: false }) as { sport?: string };
+  const [sport, setSport] = useState<"nba" | "mlb">(
+    search.sport === "mlb" ? "mlb" : "nba",
+  );
   const {
     data: gamesResponse,
     isLoading,

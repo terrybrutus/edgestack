@@ -241,7 +241,8 @@ export async function buildInvestigationFromBdl(
   }));
 
   const restAdvantage =
-    Math.abs(homeRestDays - awayRestDays) >= 1
+    Math.abs(homeRestDays - awayRestDays) >= 1 &&
+    !(homeRestDays >= 14 && awayRestDays >= 14)
       ? {
           homeRestDays: BigInt(homeRestDays),
           awayRestDays: BigInt(awayRestDays),
@@ -281,7 +282,7 @@ export async function fetchActivePlayersForGame(
   const today = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/New_York",
   });
-  const games = await fetchGamesForDate(today);
+  const games = await fetchGamesForDate(today).catch(() => []);
   const bdlGame = games.find((g) => String(g.id) === gameId);
   if (!bdlGame) return null;
 
@@ -458,7 +459,9 @@ export function computeRestDays(
   const lastGame = new Date(finals[0].date);
   const target = new Date(gameDate);
   const diff = Math.round((target.getTime() - lastGame.getTime()) / 86400000);
-  return Math.max(0, diff - 1);
+  const days = Math.max(0, diff - 1);
+  // Cap at 14 — beyond that it's off-season gap, not a meaningful rest signal
+  return Math.min(days, 14);
 }
 
 function buildTeamStats(

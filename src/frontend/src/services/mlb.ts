@@ -178,63 +178,208 @@ export async function fetchBullpenUsage(
 }
 
 // ── Park factors (static — updated each offseason) ───────────────────────────
-// Scale: 100 = neutral. Source: multi-year composite.
-const PARK_FACTORS: Record<number, ParkFactor> = {
-  2: {
+// Scale: 100 = neutral. Source: multi-year composite (Statcast/BaseballSavant).
+// Keyed by lowercase substring of MLB Stats API venue.name — avoids hardcoding opaque IDs.
+const PARK_FACTORS: Array<{
+  match: string;
+  runFactor: number;
+  hrFactor: number;
+  description: string;
+}> = [
+  {
+    match: "coors",
     runFactor: 112,
     hrFactor: 118,
     description: "Coors Field — extreme hitter park, altitude boosts carry",
   },
-  15: {
+  {
+    match: "great american",
     runFactor: 108,
     hrFactor: 114,
     description: "Great American Ball Park — short porch in RF",
   },
-  4: {
+  {
+    match: "fenway",
     runFactor: 106,
     hrFactor: 110,
     description: "Fenway Park — Green Monster creates extra hits",
   },
-  10: {
+  {
+    match: "wrigley",
     runFactor: 104,
     hrFactor: 108,
     description: "Wrigley Field — wind-dependent, plays big with wind out",
   },
-  1: {
-    runFactor: 98,
-    hrFactor: 95,
+  {
+    match: "yankee",
+    runFactor: 103,
+    hrFactor: 111,
+    description:
+      "Yankee Stadium — short RF porch, favorable for lefty pull hitters",
+  },
+  {
+    match: "kauffman",
+    runFactor: 102,
+    hrFactor: 99,
+    description:
+      "Kauffman Stadium — large outfield, gap hits inflate run factor",
+  },
+  {
+    match: "globe life",
+    runFactor: 101,
+    hrFactor: 102,
+    description: "Globe Life Field — indoor, consistent conditions",
+  },
+  {
+    match: "citizens bank",
+    runFactor: 101,
+    hrFactor: 104,
+    description: "Citizens Bank Park — hitter-friendly dimensions",
+  },
+  {
+    match: "target field",
+    runFactor: 100,
+    hrFactor: 98,
+    description:
+      "Target Field — neutral, cold spring air suppresses early season",
+  },
+  {
+    match: "truist",
+    runFactor: 100,
+    hrFactor: 101,
+    description: "Truist Park — near-neutral dimensions",
+  },
+  {
+    match: "progressive",
+    runFactor: 99,
+    hrFactor: 97,
+    description: "Progressive Field — pitcher-leaning, deep power alleys",
+  },
+  {
+    match: "camden yards",
+    runFactor: 99,
+    hrFactor: 97,
     description: "Oriole Park — moderate pitcher-friendly dimensions",
   },
-  22: {
+  {
+    match: "oriole park",
+    runFactor: 99,
+    hrFactor: 97,
+    description: "Oriole Park — moderate pitcher-friendly dimensions",
+  },
+  {
+    match: "american family",
+    runFactor: 99,
+    hrFactor: 98,
+    description: "American Family Field — retractable roof, mild pitcher lean",
+  },
+  {
+    match: "busch",
+    runFactor: 98,
+    hrFactor: 96,
+    description: "Busch Stadium — spacious outfield, pitcher-friendly",
+  },
+  {
+    match: "pnc park",
+    runFactor: 97,
+    hrFactor: 94,
+    description: "PNC Park — spacious outfield, river air suppresses",
+  },
+  {
+    match: "nationals park",
+    runFactor: 97,
+    hrFactor: 96,
+    description: "Nationals Park — pitcher-leaning, large outfield",
+  },
+  {
+    match: "comerica",
+    runFactor: 97,
+    hrFactor: 93,
+    description: "Comerica Park — one of the most pitcher-friendly parks",
+  },
+  {
+    match: "petco",
     runFactor: 96,
     hrFactor: 92,
     description: "Petco Park — spacious outfield, marine layer suppresses",
   },
-  31: {
+  {
+    match: "sutter health",
+    runFactor: 96,
+    hrFactor: 94,
+    description: "Sutter Health Park — moderate pitcher lean",
+  },
+  {
+    match: "oracle",
     runFactor: 95,
     hrFactor: 90,
     description: "Oracle Park — massive foul territory, marine air",
   },
-  7: {
-    runFactor: 94,
-    hrFactor: 91,
+  {
+    match: "dodger",
+    runFactor: 95,
+    hrFactor: 93,
     description: "Dodger Stadium — consistent pitcher-friendly environment",
   },
-  32: {
+  {
+    match: "t-mobile",
     runFactor: 93,
     hrFactor: 88,
     description: "T-Mobile Park — marine air, deep fences",
   },
-};
+  {
+    match: "citi field",
+    runFactor: 93,
+    hrFactor: 90,
+    description: "Citi Field — large outfield, marine air off Flushing Bay",
+  },
+  {
+    match: "loandepot",
+    runFactor: 100,
+    hrFactor: 100,
+    description: "loanDepot Park — indoor dome, neutral conditions",
+  },
+  {
+    match: "chase field",
+    runFactor: 100,
+    hrFactor: 103,
+    description:
+      "Chase Field — indoor/retractable, slight HR lean when roof open",
+  },
+  {
+    match: "tropicana",
+    runFactor: 98,
+    hrFactor: 97,
+    description: "Tropicana Field — indoor, catwalk interference factor",
+  },
+  {
+    match: "rogers centre",
+    runFactor: 100,
+    hrFactor: 100,
+    description: "Rogers Centre — indoor dome, neutral conditions",
+  },
+  {
+    match: "minute maid",
+    runFactor: 101,
+    hrFactor: 103,
+    description: "Minute Maid Park — Tal's Hill removed, still hitter-leaning",
+  },
+];
 
-export function getParkFactor(venueId: number): ParkFactor {
-  return (
-    PARK_FACTORS[venueId] ?? {
-      runFactor: 100,
-      hrFactor: 100,
-      description: "Neutral park factors",
-    }
-  );
+export function getParkFactor(venueName: string): ParkFactor {
+  const lower = venueName.toLowerCase();
+  const match = PARK_FACTORS.find((p) => lower.includes(p.match));
+  return match
+    ? {
+        runFactor: match.runFactor,
+        hrFactor: match.hrFactor,
+        description: match.description,
+      }
+    : {
+        runFactor: 100,
+        hrFactor: 100,
+        description: `${venueName} — park factor data not available`,
+      };
 }
 
 // ── Umpire tendencies (static — updated periodically) ────────────────────────

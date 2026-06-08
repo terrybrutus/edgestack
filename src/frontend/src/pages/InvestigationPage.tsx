@@ -49,6 +49,61 @@ import {
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
+// ─── Inline markdown renderer (no external dep) ───────────────────────────────
+function MarkdownBlock({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-1.5 text-sm font-body text-muted-foreground leading-relaxed">
+      {lines.map((line, i) => {
+        if (/^#{1,3} /.test(line)) {
+          const content = line.replace(/^#+\s*/, "");
+          return (
+            <p
+              key={i}
+              className="font-semibold text-foreground mt-3 first:mt-0"
+            >
+              {renderInline(content)}
+            </p>
+          );
+        }
+        if (/^---+$/.test(line.trim())) {
+          return <hr key={i} className="border-border/40 my-2" />;
+        }
+        if (/^\d+\.\s/.test(line)) {
+          return (
+            <p key={i} className="pl-4">
+              {renderInline(line)}
+            </p>
+          );
+        }
+        if (/^[-*]\s/.test(line)) {
+          return (
+            <p key={i} className="pl-4">
+              • {renderInline(line.replace(/^[-*]\s/, ""))}
+            </p>
+          );
+        }
+        if (line.trim() === "") return <div key={i} className="h-1" />;
+        return <p key={i}>{renderInline(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function renderInline(text: string): React.ReactNode {
+  // bold: **text**
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i} className="text-foreground font-semibold">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 // ─── Sparkline mini-chart ─────────────────────────────────────────────────────
 function Sparkline({ values, max }: { values: number[]; max: number }) {
   return (
@@ -594,11 +649,9 @@ function PlayerPropsTab({
           </Button>
         </div>
         {aiAnalysis && (
-          <blockquote className="border-l-2 border-primary/40 pl-4">
-            <p className="text-sm font-body text-muted-foreground leading-relaxed">
-              {aiAnalysis}
-            </p>
-          </blockquote>
+          <div className="border-l-2 border-primary/40 pl-4">
+            <MarkdownBlock text={aiAnalysis} />
+          </div>
         )}
         {propsAI.isError && (
           <p
@@ -1019,11 +1072,9 @@ function GameTotalTab({
           </Button>
         </div>
         {aiAnalysis && (
-          <blockquote className="border-l-2 border-primary/40 pl-4">
-            <p className="text-sm font-body text-muted-foreground leading-relaxed">
-              {aiAnalysis}
-            </p>
-          </blockquote>
+          <div className="border-l-2 border-primary/40 pl-4">
+            <MarkdownBlock text={aiAnalysis} />
+          </div>
         )}
         {totalsAI.isError && (
           <p
