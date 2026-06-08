@@ -1,20 +1,23 @@
-import Map "mo:core/Map";
-import HistoryTypes "../types/history";
+import List "mo:core/List";
 
 module {
+  type Item = {
+    id : Nat;
+    title : Text;
+    status : { #todo; #done };
+  };
+
   type OldActor = {};
 
   type NewActor = {
-    betHistory : Map.Map<Text, HistoryTypes.BetRecommendation>;
-    lineOpenStore : Map.Map<Text, Text>;
-    OPENAI_API_KEY : Text;
+    items : List.List<Item>;
+    state : { var nextId : Nat };
   };
 
   public func migration(_ : OldActor) : NewActor {
     {
-      betHistory = Map.empty<Text, HistoryTypes.BetRecommendation>();
-      lineOpenStore = Map.empty<Text, Text>();
-      OPENAI_API_KEY = "";
+      items = List.empty<Item>();
+      state = { var nextId = 0 };
     };
   };
 };
