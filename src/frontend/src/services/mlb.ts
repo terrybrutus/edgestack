@@ -32,7 +32,7 @@ export interface MlbPitcherStats {
 
 export interface MlbGame {
   gamePk: number;
-  gameDate: string;            // ISO UTC
+  gameDate: string; // ISO UTC
   status: { abstractGameState: string; detailedState: string };
   teams: {
     home: { team: MlbTeam; score?: number; probablePitcher?: MlbPitcher };
@@ -48,7 +48,7 @@ export interface MlbUmpire {
 }
 
 export interface ParkFactor {
-  runFactor: number;   // 100 = neutral, >100 = hitter-friendly
+  runFactor: number; // 100 = neutral, >100 = hitter-friendly
   hrFactor: number;
   description: string;
 }
@@ -101,21 +101,21 @@ export async function fetchMlbPitcherStats(
     )?.stat;
 
   return {
-    era: season_stat?.era ? parseFloat(season_stat.era) : null,
-    whip: season_stat?.whip ? parseFloat(season_stat.whip) : null,
+    era: season_stat?.era ? Number.parseFloat(season_stat.era) : null,
+    whip: season_stat?.whip ? Number.parseFloat(season_stat.whip) : null,
     strikeoutsPer9: season_stat?.strikeoutsPer9Inn
-      ? parseFloat(season_stat.strikeoutsPer9Inn)
+      ? Number.parseFloat(season_stat.strikeoutsPer9Inn)
       : null,
     walksPer9: season_stat?.walksPer9Inn
-      ? parseFloat(season_stat.walksPer9Inn)
+      ? Number.parseFloat(season_stat.walksPer9Inn)
       : null,
     inningsPitched: season_stat?.inningsPitched
-      ? parseFloat(season_stat.inningsPitched)
+      ? Number.parseFloat(season_stat.inningsPitched)
       : null,
     wins: season_stat?.wins ?? null,
     losses: season_stat?.losses ?? null,
-    homeEra: home_stat?.era ? parseFloat(home_stat.era) : null,
-    awayEra: away_stat?.era ? parseFloat(away_stat.era) : null,
+    homeEra: home_stat?.era ? Number.parseFloat(home_stat.era) : null,
+    awayEra: away_stat?.era ? Number.parseFloat(away_stat.era) : null,
     lastStartDate: null,
     daysSinceLastStart: null,
   };
@@ -138,7 +138,7 @@ export async function fetchUmpireForGame(
 
 export async function fetchBullpenUsage(
   teamId: number,
-  season: number,
+  _season: number,
 ): Promise<{ fatigueLevel: "HIGH" | "MEDIUM" | "LOW"; detail: string }> {
   // Fetch team pitching stats for last 3 days to estimate bullpen fatigue
   const today = new Date();
@@ -156,9 +156,8 @@ export async function fetchBullpenUsage(
   const gamesPlayed = dates.reduce(
     (acc: number, d: { games: MlbGame[] }) =>
       acc +
-      (d.games ?? []).filter(
-        (g) => g.status.abstractGameState === "Final",
-      ).length,
+      (d.games ?? []).filter((g) => g.status.abstractGameState === "Final")
+        .length,
     0,
   );
 
@@ -181,15 +180,51 @@ export async function fetchBullpenUsage(
 // ── Park factors (static — updated each offseason) ───────────────────────────
 // Scale: 100 = neutral. Source: multi-year composite.
 const PARK_FACTORS: Record<number, ParkFactor> = {
-  2  : { runFactor: 112, hrFactor: 118, description: "Coors Field — extreme hitter park, altitude boosts carry" },
-  15 : { runFactor: 108, hrFactor: 114, description: "Great American Ball Park — short porch in RF" },
-  4  : { runFactor: 106, hrFactor: 110, description: "Fenway Park — Green Monster creates extra hits" },
-  10 : { runFactor: 104, hrFactor: 108, description: "Wrigley Field — wind-dependent, plays big with wind out" },
-  1  : { runFactor: 98,  hrFactor: 95,  description: "Oriole Park — moderate pitcher-friendly dimensions" },
-  22 : { runFactor: 96,  hrFactor: 92,  description: "Petco Park — spacious outfield, marine layer suppresses" },
-  31 : { runFactor: 95,  hrFactor: 90,  description: "Oracle Park — massive foul territory, marine air" },
-  7  : { runFactor: 94,  hrFactor: 91,  description: "Dodger Stadium — consistent pitcher-friendly environment" },
-  32 : { runFactor: 93,  hrFactor: 88,  description: "T-Mobile Park — marine air, deep fences" },
+  2: {
+    runFactor: 112,
+    hrFactor: 118,
+    description: "Coors Field — extreme hitter park, altitude boosts carry",
+  },
+  15: {
+    runFactor: 108,
+    hrFactor: 114,
+    description: "Great American Ball Park — short porch in RF",
+  },
+  4: {
+    runFactor: 106,
+    hrFactor: 110,
+    description: "Fenway Park — Green Monster creates extra hits",
+  },
+  10: {
+    runFactor: 104,
+    hrFactor: 108,
+    description: "Wrigley Field — wind-dependent, plays big with wind out",
+  },
+  1: {
+    runFactor: 98,
+    hrFactor: 95,
+    description: "Oriole Park — moderate pitcher-friendly dimensions",
+  },
+  22: {
+    runFactor: 96,
+    hrFactor: 92,
+    description: "Petco Park — spacious outfield, marine layer suppresses",
+  },
+  31: {
+    runFactor: 95,
+    hrFactor: 90,
+    description: "Oracle Park — massive foul territory, marine air",
+  },
+  7: {
+    runFactor: 94,
+    hrFactor: 91,
+    description: "Dodger Stadium — consistent pitcher-friendly environment",
+  },
+  32: {
+    runFactor: 93,
+    hrFactor: 88,
+    description: "T-Mobile Park — marine air, deep fences",
+  },
 };
 
 export function getParkFactor(venueId: number): ParkFactor {
@@ -212,12 +247,42 @@ interface UmpireTendency {
 }
 
 const UMPIRE_TENDENCIES: Record<number, UmpireTendency> = {
-  427:  { name: "Angel Hernandez",  kZoneSize: "SMALL",   overRate: 54, tendency: "Small zone, high scoring games, over lean" },
-  354:  { name: "CB Bucknor",       kZoneSize: "SMALL",   overRate: 55, tendency: "Below-average strike zone, suppresses Ks, hitter-friendly" },
-  68:   { name: "Joe West",         kZoneSize: "LARGE",   overRate: 45, tendency: "Expansive zone, pitchers benefit, under lean" },
-  551:  { name: "Dan Bellino",      kZoneSize: "LARGE",   overRate: 46, tendency: "Wide zone, quick games, under lean" },
-  514:  { name: "Adrian Johnson",   kZoneSize: "AVERAGE", overRate: 51, tendency: "Near neutral, slight over tendency" },
-  583:  { name: "Nic Lentz",        kZoneSize: "LARGE",   overRate: 44, tendency: "Pitcher-friendly zone" },
+  427: {
+    name: "Angel Hernandez",
+    kZoneSize: "SMALL",
+    overRate: 54,
+    tendency: "Small zone, high scoring games, over lean",
+  },
+  354: {
+    name: "CB Bucknor",
+    kZoneSize: "SMALL",
+    overRate: 55,
+    tendency: "Below-average strike zone, suppresses Ks, hitter-friendly",
+  },
+  68: {
+    name: "Joe West",
+    kZoneSize: "LARGE",
+    overRate: 45,
+    tendency: "Expansive zone, pitchers benefit, under lean",
+  },
+  551: {
+    name: "Dan Bellino",
+    kZoneSize: "LARGE",
+    overRate: 46,
+    tendency: "Wide zone, quick games, under lean",
+  },
+  514: {
+    name: "Adrian Johnson",
+    kZoneSize: "AVERAGE",
+    overRate: 51,
+    tendency: "Near neutral, slight over tendency",
+  },
+  583: {
+    name: "Nic Lentz",
+    kZoneSize: "LARGE",
+    overRate: 44,
+    tendency: "Pitcher-friendly zone",
+  },
 };
 
 export function getUmpireTendency(umpireId: number): UmpireTendency | null {
@@ -228,9 +293,17 @@ export function getUmpireTendency(umpireId: number): UmpireTendency | null {
 
 function emptyPitcherStats(): MlbPitcherStats {
   return {
-    era: null, whip: null, strikeoutsPer9: null, walksPer9: null,
-    inningsPitched: null, wins: null, losses: null,
-    homeEra: null, awayEra: null, lastStartDate: null, daysSinceLastStart: null,
+    era: null,
+    whip: null,
+    strikeoutsPer9: null,
+    walksPer9: null,
+    inningsPitched: null,
+    wins: null,
+    losses: null,
+    homeEra: null,
+    awayEra: null,
+    lastStartDate: null,
+    daysSinceLastStart: null,
   };
 }
 

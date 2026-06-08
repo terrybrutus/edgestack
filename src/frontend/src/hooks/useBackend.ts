@@ -8,20 +8,30 @@ import {
   type BetStatus,
   createActor,
 } from "@/backend";
-import { getApiErrorMessage } from "@/types";
-import type { Game, GameInvestigation, GameTotal, GamesResponse, PlayerPropsAnalysis } from "@/types";
-import { useActor } from "@caffeineai/core-infrastructure";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchGamesForDate,
-  fetchTeamLastNGames,
-  fetchActivePlayersForGame,
-  fetchSeasonAveragesForGame,
+  buildNbaPropsPrompt,
+  buildNbaTotalsPrompt,
+  claudeAnalyze,
+} from "@/services/claude";
+import {
   buildGameFromBdl,
   buildInvestigationFromBdl,
+  fetchActivePlayersForGame,
+  fetchGamesForDate,
+  fetchSeasonAveragesForGame,
+  fetchTeamLastNGames,
 } from "@/services/games-facade";
 import { fetchOdds } from "@/services/odds";
-import { claudeAnalyze, buildNbaPropsPrompt, buildNbaTotalsPrompt } from "@/services/claude";
+import { getApiErrorMessage } from "@/types";
+import type {
+  Game,
+  GameInvestigation,
+  GameTotal,
+  GamesResponse,
+  PlayerPropsAnalysis,
+} from "@/types";
+import { useActor } from "@caffeineai/core-infrastructure";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ── Games (BDL direct) ────────────────────────────────────────────────────────
 
@@ -201,12 +211,17 @@ export function useUpdateClosingLine() {
   >({
     mutationFn: async ({ id, closingLine, preGameLine }) => {
       if (!actor) throw new Error("Actor not ready");
-      const result = await actor.updateClosingLine(id, closingLine, preGameLine);
+      const result = await actor.updateClosingLine(
+        id,
+        closingLine,
+        preGameLine,
+      );
       if (result.__kind__ === "err")
         throw new Error(getApiErrorMessage(result.err));
       return result.ok;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bet-history"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["bet-history"] }),
   });
 }
 

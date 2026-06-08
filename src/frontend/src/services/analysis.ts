@@ -5,18 +5,18 @@ export type SignalDirection = "HOME" | "AWAY" | "OVER" | "UNDER" | "PASS";
 export type SignalStrength = "STRONG" | "MODERATE" | "WEAK";
 
 export interface Signal {
-  category: string;       // "Line Movement", "Rest Advantage", "Weather", etc.
+  category: string; // "Line Movement", "Rest Advantage", "Weather", etc.
   direction: SignalDirection;
   strength: SignalStrength;
   description: string;
-  confidence: number;     // 0-100
+  confidence: number; // 0-100
 }
 
 export interface StackedEdge {
   signals: Signal[];
   recommendation: SignalDirection;
-  stackConfidence: number;   // 0-100 composite
-  convergenceCount: number;  // how many signals agree
+  stackConfidence: number; // 0-100 composite
+  convergenceCount: number; // how many signals agree
   summary: string;
 }
 
@@ -35,8 +35,8 @@ export interface NbaEdgeInputs {
   homeML: number | null;
   awayML: number | null;
   refereeName: string | null;
-  refereeOverRate: number | null;    // % of games going over
-  refereeFoulRate: number | null;    // fouls per game
+  refereeOverRate: number | null; // % of games going over
+  refereeFoulRate: number | null; // fouls per game
   isPlayoffs: boolean;
 }
 
@@ -113,7 +113,8 @@ export function analyzeNbaEdge(inputs: NbaEdgeInputs): StackedEdge {
         category: "Playoff B2B Penalty",
         direction: "UNDER",
         strength: "MODERATE",
-        description: "Back-to-back in playoffs — fatigue suppresses scoring, under lean",
+        description:
+          "Back-to-back in playoffs — fatigue suppresses scoring, under lean",
         confidence: 62,
       });
     }
@@ -132,7 +133,7 @@ export interface MlbEdgeInputs {
   awayPitcherName: string | null;
   homePitcherEra: number | null;
   awayPitcherEra: number | null;
-  homePitcherHomeEra: number | null;   // pitcher's home/away split
+  homePitcherHomeEra: number | null; // pitcher's home/away split
   awayPitcherAwayEra: number | null;
   homePitcherDaysSinceStart: number | null;
   awayPitcherDaysSinceStart: number | null;
@@ -141,7 +142,7 @@ export interface MlbEdgeInputs {
   umpireKZone: "LARGE" | "AVERAGE" | "SMALL" | null;
   umpireOverRate: number | null;
   umpireName: string | null;
-  parkRunFactor: number;  // 100 = neutral
+  parkRunFactor: number; // 100 = neutral
   weatherSignal: "OVER" | "UNDER" | "NEUTRAL";
   weatherDescription: string;
   openTotal: number | null;
@@ -158,7 +159,8 @@ export function analyzeMlbEdge(inputs: MlbEdgeInputs): StackedEdge {
     const eraDiff = inputs.awayPitcherEra - inputs.homePitcherEra;
     if (Math.abs(eraDiff) >= 0.75) {
       const dir = eraDiff > 0 ? "HOME" : "AWAY";
-      const better = eraDiff > 0 ? inputs.homePitcherName : inputs.awayPitcherName;
+      const better =
+        eraDiff > 0 ? inputs.homePitcherName : inputs.awayPitcherName;
       signals.push({
         category: "Pitcher Matchup",
         direction: dir as SignalDirection,
@@ -201,7 +203,7 @@ export function analyzeMlbEdge(inputs: MlbEdgeInputs): StackedEdge {
         category: "Pitcher Fatigue",
         direction: side === "HOME" ? "AWAY" : "HOME",
         strength: days <= 2 ? "STRONG" : "MODERATE",
-        description: `${name ?? side + " starter"} on short rest (${days}d) — fatigue risk`,
+        description: `${name ?? `${side} starter`} on short rest (${days}d) — fatigue risk`,
         confidence: days <= 2 ? 70 : 60,
       });
     }
@@ -299,7 +301,13 @@ function stackSignals(
   awayTeam: string,
 ): StackedEdge {
   if (signals.length === 0) {
-    return { signals, recommendation: "PASS", stackConfidence: 0, convergenceCount: 0, summary: "No significant signals detected." };
+    return {
+      signals,
+      recommendation: "PASS",
+      stackConfidence: 0,
+      convergenceCount: 0,
+      summary: "No significant signals detected.",
+    };
   }
 
   // Count direction votes
@@ -325,9 +333,7 @@ function stackSignals(
     convergenceCount >= 2 ? (topDir as SignalDirection) : "PASS";
 
   const teamLabel =
-    topDir === "HOME" ? homeTeam
-    : topDir === "AWAY" ? awayTeam
-    : topDir;
+    topDir === "HOME" ? homeTeam : topDir === "AWAY" ? awayTeam : topDir;
 
   const summary =
     convergenceCount >= 3
@@ -336,5 +342,11 @@ function stackSignals(
         ? `2 signals aligned on ${teamLabel} — moderate conviction`
         : `Only 1 signal (${teamLabel}) — insufficient convergence, PASS`;
 
-  return { signals, recommendation, stackConfidence, convergenceCount, summary };
+  return {
+    signals,
+    recommendation,
+    stackConfidence,
+    convergenceCount,
+    summary,
+  };
 }

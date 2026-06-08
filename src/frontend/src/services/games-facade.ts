@@ -9,19 +9,19 @@ import type {
   PlayerPropsAnalysis,
   TeamStats,
 } from "@/types";
+import { analyzeNbaEdge } from "./analysis";
 import {
   type BdlGame,
   bdlStatusToDisplayTime,
   bdlStatusToEtDate,
+  fetchActivePlayers,
   fetchGamesForDate,
-  fetchTeamLastNGames,
   fetchPlayerStatsForGame,
   fetchSeasonAverages,
-  fetchActivePlayers,
+  fetchTeamLastNGames,
   parseBdlStatus,
 } from "./bdl";
 import { fetchOdds, parseOddsEvent } from "./odds";
-import { analyzeNbaEdge } from "./analysis";
 
 // Re-export so hooks can import from one place
 export { fetchGamesForDate, fetchTeamLastNGames };
@@ -84,9 +84,7 @@ export async function buildInvestigationFromBdl(
   const games = await fetchGamesForDate(gameDate);
   const bdlGame = games.find((g) => String(g.id) === gameId);
   if (!bdlGame)
-    throw new Error(
-      `Game ${gameId} not found in BDL games for ${gameDate}`,
-    );
+    throw new Error(`Game ${gameId} not found in BDL games for ${gameDate}`);
 
   const game = buildGameFromBdl(bdlGame);
   const homeId = bdlGame.home_team.id;
@@ -102,8 +100,7 @@ export async function buildInvestigationFromBdl(
 
   const homeRecent = homeGames.status === "fulfilled" ? homeGames.value : [];
   const awayRecent = awayGames.status === "fulfilled" ? awayGames.value : [];
-  const odds =
-    oddsEvents.status === "fulfilled" ? oddsEvents.value : [];
+  const odds = oddsEvents.status === "fulfilled" ? oddsEvents.value : [];
 
   // 3. Find matching odds event
   const oddsEvent = odds.find(
@@ -124,8 +121,10 @@ export async function buildInvestigationFromBdl(
           bookmaker: bm.title,
           homeSpread: p.homeSpread ?? undefined,
           awaySpread: p.awaySpread ?? undefined,
-          homeSpreadOdds: p.homeSpreadOdds != null ? BigInt(p.homeSpreadOdds) : undefined,
-          awaySpreadOdds: p.awaySpreadOdds != null ? BigInt(p.awaySpreadOdds) : undefined,
+          homeSpreadOdds:
+            p.homeSpreadOdds != null ? BigInt(p.homeSpreadOdds) : undefined,
+          awaySpreadOdds:
+            p.awaySpreadOdds != null ? BigInt(p.awaySpreadOdds) : undefined,
           overUnder: p.total ?? undefined,
           overOdds: p.overOdds != null ? BigInt(p.overOdds) : undefined,
           underOdds: p.underOdds != null ? BigInt(p.underOdds) : undefined,
@@ -141,16 +140,8 @@ export async function buildInvestigationFromBdl(
   const awayRestDays = computeRestDays(awayRecent, gameDate);
 
   // 5. Build team stats
-  const homeStats = buildTeamStats(
-    String(homeId),
-    homeRecent,
-    homeRestDays,
-  );
-  const awayStats = buildTeamStats(
-    String(awayId),
-    awayRecent,
-    awayRestDays,
-  );
+  const homeStats = buildTeamStats(String(homeId), homeRecent, homeRestDays);
+  const awayStats = buildTeamStats(String(awayId), awayRecent, awayRestDays);
 
   // 6. Edge analysis (signal stacking)
   const edgeInputs = {
@@ -247,7 +238,7 @@ export async function fetchActivePlayersForGame(
         position: p.position,
       },
       seasonAvgPoints: avg?.pts ?? 0,
-      seasonAvgMinutes: parseFloat(avg?.min ?? "0") || 0,
+      seasonAvgMinutes: Number.parseFloat(avg?.min ?? "0") || 0,
       seasonUsageRate: 0,
       homeAwaySplit: 0,
       backToBack: false,
@@ -288,8 +279,8 @@ export async function fetchActivePlayersForGame(
 
 export async function fetchSeasonAveragesForGame(
   gameId: string,
-  homeTeamName: string,
-  awayTeamName: string,
+  _homeTeamName: string,
+  _awayTeamName: string,
 ): Promise<GameTotal | null> {
   const today = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/New_York",
@@ -378,7 +369,7 @@ export async function fetchSeasonAveragesForGame(
       avgPointsAgainst: 110,
       last5Avg:
         homeScores.slice(0, 5).reduce((a, b) => a + b, 0) /
-          Math.max(homeScores.slice(0, 5).length, 1),
+        Math.max(homeScores.slice(0, 5).length, 1),
     },
     awayPace: {
       teamId: String(bdlGame.visitor_team.id),
@@ -389,7 +380,7 @@ export async function fetchSeasonAveragesForGame(
       avgPointsAgainst: 110,
       last5Avg:
         awayScores.slice(0, 5).reduce((a, b) => a + b, 0) /
-          Math.max(awayScores.slice(0, 5).length, 1),
+        Math.max(awayScores.slice(0, 5).length, 1),
     },
     impliedTotal: undefined,
     projectedTotal,
@@ -406,17 +397,14 @@ function computeRestDays(recentGames: BdlGame[], gameDate: string): number {
   const finals = recentGames
     .filter(
       (g) =>
-        (g.status ?? "").toLowerCase().startsWith("final") &&
-        g.date < gameDate,
+        (g.status ?? "").toLowerCase().startsWith("final") && g.date < gameDate,
     )
     .sort((a, b) => b.date.localeCompare(a.date));
 
   if (finals.length === 0) return 3;
   const lastGame = new Date(finals[0].date);
   const target = new Date(gameDate);
-  const diff = Math.round(
-    (target.getTime() - lastGame.getTime()) / 86400000,
-  );
+  const diff = Math.round((target.getTime() - lastGame.getTime()) / 86400000);
   return Math.max(0, diff - 1);
 }
 
@@ -435,9 +423,7 @@ function buildTeamStats(
     return isHome ? g.home_team_score : g.visitor_team_score;
   });
   const ppg =
-    scores.length > 0
-      ? scores.reduce((a, b) => a + b, 0) / scores.length
-      : 110;
+    scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 110;
 
   return {
     teamId,

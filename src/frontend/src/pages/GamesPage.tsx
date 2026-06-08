@@ -114,7 +114,8 @@ function GameCard({
   // Compare game date to user's local date — don't rely on backend UTC isUpcoming flag.
   // A game is "not today" if gamesDate differs from the user's local calendar date.
   const localTodayStr = new Date().toLocaleDateString("en-CA"); // "YYYY-MM-DD" in local tz
-  const showDatePrefix = !isFinal && !isLive && gamesDate && gamesDate !== localTodayStr;
+  const showDatePrefix =
+    !isFinal && !isLive && gamesDate && gamesDate !== localTodayStr;
 
   return (
     <motion.div

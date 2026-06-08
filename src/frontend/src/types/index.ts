@@ -1,10 +1,10 @@
 import {
+  type ApiError,
+  type ApiStatus,
   type BetHistoryStats,
   type BetRecommendation,
   BetStatus,
   BetType,
-  type ApiError,
-  type ApiStatus,
   type GameId,
 } from "@/backend";
 
