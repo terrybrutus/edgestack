@@ -9,13 +9,14 @@ import Array "mo:core/Array";
 // Cycle consumption is near-zero: no HTTP outcalls, pure key/value storage.
 actor {
   // ── Stable state ──────────────────────────────────────────────────────────
-  let betHistory : Map.Map<Text, HistoryTypes.BetRecommendation> = Map.empty();
+  // No initializers — enhanced migration requires initialization via migration functions.
+  let betHistory : Map.Map<Text, HistoryTypes.BetRecommendation>;
 
   // Line movement: gameId → "spread|total|hml" snapshot at open
-  let lineOpenStore : Map.Map<Text, Text> = Map.empty();
+  let lineOpenStore : Map.Map<Text, Text>;
 
   // Retained for stable variable compatibility with previous canister version.
-  let OPENAI_API_KEY : Text = "";
+  let OPENAI_API_KEY : Text;
 
   // ── Bet history ───────────────────────────────────────────────────────────
 
@@ -131,7 +132,8 @@ actor {
     for (c in s.chars()) {
       if (c == '.') { inFrac := true }
       else if (c >= '0' and c <= '9') {
-        let d = Float.fromInt(c.toNat32() - 48 : Nat32 |> _.toNat());
+        let n = (c.toNat32() - 48 : Nat32).toNat();
+        let d : Float = n.toFloat();
         if (inFrac) { fracDiv *= 10.0; fracPart += d / fracDiv }
         else { intPart := intPart * 10.0 + d };
       };
