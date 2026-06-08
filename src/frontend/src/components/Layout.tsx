@@ -1,4 +1,3 @@
-import { OpenAIKeyModal } from "@/components/OpenAIKeyModal";
 import { Button } from "@/components/ui/button";
 import {
   useIsOddsApiConfigured,

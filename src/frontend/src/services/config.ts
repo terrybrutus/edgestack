@@ -1,5 +1,7 @@
 // API keys for EdgeStack — single-user personal app.
 // All external API calls happen in the browser; the canister does zero HTTP outcalls.
+// NOTE: browser-side API calls inherently expose these keys in the JS bundle.
+// Rotate any key that leaks; use server-side proxies if this becomes multi-user.
 export const CONFIG = {
   BDL_API_KEY: "866f00d3-c11f-4b46-bf67-6e37accde2b9",
   ODDS_API_KEY: "6f6725d8b12b239c51bd1b404fd83c5e",

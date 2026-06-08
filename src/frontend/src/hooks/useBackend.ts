@@ -16,6 +16,7 @@ import {
 import {
   buildGameFromBdl,
   buildInvestigationFromBdl,
+  computeRestDays,
   fetchActivePlayersForGame,
   fetchGamesForDate,
   fetchSeasonAveragesForGame,
@@ -86,6 +87,7 @@ export function useTodayGames() {
 }
 
 export function useGameDetail(gameId: string, gameDate = "") {
+  const { actor } = useActor(createActor);
   return useQuery<GameInvestigation>({
     queryKey: ["game-detail", gameId, gameDate],
     queryFn: async () => {
@@ -95,7 +97,13 @@ export function useGameDetail(gameId: string, gameDate = "") {
         new Date().toLocaleDateString("en-CA", {
           timeZone: "America/New_York",
         });
-      return buildInvestigationFromBdl(gameId, date);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const investigation = await buildInvestigationFromBdl(
+        gameId,
+        date,
+        actor as any,
+      );
+      return investigation;
     },
     enabled: !!gameId,
     retry: 2,
@@ -255,14 +263,16 @@ export function useSaveBetRecommendation() {
   });
 }
 
-// ── Status (always true — keys are in frontend config) ────────────────────────
+// ── Status — checks that config keys are non-empty ────────────────────────────
 
 export function useIsOpenAIConfigured() {
   return useQuery<boolean>({
     queryKey: ["openai-configured"],
-    queryFn: async () => true,
+    queryFn: async () => {
+      const { CONFIG } = await import("@/services/config");
+      return CONFIG.CLAUDE_API_KEY.length > 0;
+    },
     staleTime: Number.POSITIVE_INFINITY,
-    initialData: true,
   });
 }
 
@@ -275,9 +285,11 @@ export function useSetOpenAIApiKey() {
 export function useIsBdlApiConfigured() {
   return useQuery<boolean>({
     queryKey: ["bdl-configured"],
-    queryFn: async () => true,
+    queryFn: async () => {
+      const { CONFIG } = await import("@/services/config");
+      return CONFIG.BDL_API_KEY.length > 0;
+    },
     staleTime: Number.POSITIVE_INFINITY,
-    initialData: true,
   });
 }
 
@@ -290,9 +302,11 @@ export function useSetBdlApiKey() {
 export function useIsOddsApiConfigured() {
   return useQuery<boolean>({
     queryKey: ["odds-api-configured"],
-    queryFn: async () => true,
+    queryFn: async () => {
+      const { CONFIG } = await import("@/services/config");
+      return CONFIG.ODDS_API_KEY.length > 0;
+    },
     staleTime: Number.POSITIVE_INFINITY,
-    initialData: true,
   });
 }
 
@@ -481,21 +495,8 @@ export function usePlays() {
           const awayRecent =
             awayGames.status === "fulfilled" ? awayGames.value : [];
 
-          const computeRest = (recent: typeof homeRecent): number => {
-            if (!recent.length) return 3;
-            const sorted = [...recent].sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-            );
-            const lastDate = sorted[0].date;
-            const diff = Math.round(
-              (new Date(today).getTime() - new Date(lastDate).getTime()) /
-                86400000,
-            );
-            return Math.max(0, diff);
-          };
-
-          const homeRestDays = computeRest(homeRecent);
-          const awayRestDays = computeRest(awayRecent);
+          const homeRestDays = computeRestDays(homeRecent, today);
+          const awayRestDays = computeRestDays(awayRecent, today);
 
           const oddsEvent = oddsEvents.find(
             (e) =>

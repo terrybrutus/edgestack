@@ -4,7 +4,7 @@ import {
   useMlbGames,
   useTodayGames,
 } from "@/hooks/useBackend";
-import { cn } from "@/lib/utils";
+import { cn, teamFullName } from "@/lib/utils";
 import { formatMoneyline, formatSpread } from "@/types";
 import type { Game, GameStatus } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,13 +48,6 @@ const STATUS_MAP: Record<string, StatusConfig> = {
     dotClass: "bg-accent",
     badgeClass: "text-accent border-accent/40 bg-accent/5",
   },
-};
-
-// ─── Team name helper ─────────────────────────────────────────────────────────
-const teamFullName = (city: string, name: string): string => {
-  if (!city || !name) return name || city || "";
-  if (name.toLowerCase().startsWith(city.toLowerCase())) return name;
-  return `${city} ${name}`;
 };
 
 function getStatusConfig(status: GameStatus): StatusConfig {

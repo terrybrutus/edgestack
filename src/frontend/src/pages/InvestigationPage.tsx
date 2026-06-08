@@ -11,7 +11,7 @@ import {
   usePropsAIAnalysis,
   useTotalsAIAnalysis,
 } from "@/hooks/useBackend";
-import { cn } from "@/lib/utils";
+import { cn, teamFullName } from "@/lib/utils";
 import type {
   ConfidenceReport,
   GameInvestigation,
@@ -48,13 +48,6 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-
-// ─── Team name helper ─────────────────────────────────────────────────────────
-const teamFullName = (city: string, name: string): string => {
-  if (!city || !name) return name || city || "";
-  if (name.toLowerCase().startsWith(city.toLowerCase())) return name;
-  return `${city} ${name}`;
-};
 
 // ─── Sparkline mini-chart ─────────────────────────────────────────────────────
 function Sparkline({ values, max }: { values: number[]; max: number }) {
@@ -527,7 +520,7 @@ function PlayerPropsTab({
   return (
     <div className="space-y-4">
       {/* Injury callout */}
-      {injuryPlayers.length > 0 && (
+      {injuryPlayers.length > 0 ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 flex flex-wrap gap-3 items-center">
           <span className="text-[10px] font-mono uppercase tracking-widest text-destructive">
             Injury Watch
@@ -540,6 +533,13 @@ function PlayerPropsTab({
               description={inj.description}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/30 bg-muted/10 px-4 py-2.5 flex items-center gap-2">
+          <span className="text-[10px] font-mono text-muted-foreground/60">
+            Injury data not available — check official NBA injury reports before
+            betting.
+          </span>
         </div>
       )}
 
@@ -740,8 +740,8 @@ function GameTotalTab({
 
   const report = total.confidenceReport;
   const score = report ? Number(report.score) : 0;
-  const isOver = report?.overUnderEdge?.toLowerCase().includes("over");
-  const isUnder = report?.overUnderEdge?.toLowerCase().includes("under");
+  const isOver = report?.overUnderEdge?.toUpperCase() === "OVER";
+  const isUnder = report?.overUnderEdge?.toUpperCase() === "UNDER";
 
   // Split trends: last 5 for each team by alternating or team-based
   const homeTrends = total.recentTrends.slice(0, 5);

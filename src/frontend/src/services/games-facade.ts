@@ -1,10 +1,21 @@
 // Maps BDL API data into the app's existing Game/GameInvestigation types.
 // Replaces all canister HTTP outcalls with direct browser fetches.
 
+// Minimal actor interface needed here — avoids coupling to the full generated Backend class
+interface LineActor {
+  getOpeningLine(gameId: string): Promise<string | null>;
+  recordOpeningLine(
+    gameId: string,
+    spread: string,
+    total: string,
+    homeML: string,
+  ): Promise<void>;
+}
 import type {
   Game,
   GameInvestigation,
   GameTotal,
+  LineMovement,
   OddsLine,
   PlayerPropsAnalysis,
   TeamStats,
@@ -79,6 +90,7 @@ export function buildGameFromBdl(g: BdlGame): Game {
 export async function buildInvestigationFromBdl(
   gameId: string,
   gameDate: string,
+  actor?: LineActor,
 ): Promise<GameInvestigation> {
   // 1. Find the game from BDL
   const games = await fetchGamesForDate(gameDate);
@@ -143,17 +155,74 @@ export async function buildInvestigationFromBdl(
   const homeStats = buildTeamStats(String(homeId), homeRecent, homeRestDays);
   const awayStats = buildTeamStats(String(awayId), awayRecent, awayRestDays);
 
-  // 6. Edge analysis (signal stacking)
+  // 6. Retrieve stored opening lines from canister for line movement signals
+  const currentSpread = parsedOdds?.homeSpread ?? null;
+  const currentTotal = parsedOdds?.total ?? null;
+  let openSpread = currentSpread;
+  let openTotal = currentTotal;
+  let lineMovement: LineMovement | undefined;
+
+  if (actor) {
+    try {
+      const stored = await actor.getOpeningLine(gameId);
+      if (stored) {
+        // Format stored as "spread|total" — parse back
+        const [s, t] = stored.split("|");
+        const storedSpread = s ? Number(s) : null;
+        const storedTotal = t ? Number(t) : null;
+        if (storedSpread !== null && !Number.isNaN(storedSpread))
+          openSpread = storedSpread;
+        if (storedTotal !== null && !Number.isNaN(storedTotal))
+          openTotal = storedTotal;
+      } else if (currentSpread !== null || currentTotal !== null) {
+        // First load — persist current as the opening line
+        await actor.recordOpeningLine(
+          gameId,
+          currentSpread !== null ? String(currentSpread) : "",
+          currentTotal !== null ? String(currentTotal) : "",
+          parsedOdds?.homeML !== null && parsedOdds?.homeML !== undefined
+            ? String(parsedOdds.homeML)
+            : "",
+        );
+      }
+    } catch {
+      // Canister unavailable — proceed without opening lines
+    }
+  }
+
+  if (
+    openSpread !== null &&
+    currentSpread !== null &&
+    openSpread !== currentSpread
+  ) {
+    const spreadMove = currentSpread - openSpread;
+    lineMovement = {
+      openingSpread: openSpread,
+      currentSpread,
+      spreadMove,
+      openingTotal: openTotal ?? undefined,
+      currentTotal: currentTotal ?? undefined,
+      totalMove:
+        openTotal !== null && currentTotal !== null
+          ? currentTotal - openTotal
+          : 0,
+      steamAlert: Math.abs(spreadMove) >= 2,
+      sharpSide:
+        Math.abs(spreadMove) >= 1 ? (spreadMove < 0 ? "HOME" : "AWAY") : "NONE",
+    };
+  }
+
+  // 7. Edge analysis (signal stacking)
   const edgeInputs = {
     gameId,
     homeTeam: game.homeTeam.name,
     awayTeam: game.awayTeam.name,
     homeRestDays,
     awayRestDays,
-    openSpread: parsedOdds?.homeSpread ?? null,
-    currentSpread: parsedOdds?.homeSpread ?? null,
-    openTotal: parsedOdds?.total ?? null,
-    currentTotal: parsedOdds?.total ?? null,
+    openSpread,
+    currentSpread,
+    openTotal,
+    currentTotal,
     homeML: parsedOdds?.homeML ?? null,
     awayML: parsedOdds?.awayML ?? null,
     refereeName: null,
@@ -198,7 +267,7 @@ export async function buildInvestigationFromBdl(
     awayTeamStats: awayStats,
     situationalAngles,
     restAdvantage,
-    lineMovement: undefined,
+    lineMovement,
     refereeProfile: undefined,
   };
 }
@@ -243,28 +312,9 @@ export async function fetchActivePlayersForGame(
       homeAwaySplit: 0,
       backToBack: false,
       recentGames: [],
-      propLines: avg
-        ? [
-            {
-              bookmaker: "consensus",
-              line: avg.pts,
-              overOdds: BigInt(-110),
-              underOdds: BigInt(-110),
-            },
-            {
-              bookmaker: "consensus",
-              line: avg.reb,
-              overOdds: BigInt(-110),
-              underOdds: BigInt(-110),
-            },
-            {
-              bookmaker: "consensus",
-              line: avg.ast,
-              overOdds: BigInt(-110),
-              underOdds: BigInt(-110),
-            },
-          ]
-        : [],
+      // propLines left empty — no real market lines available from BDL.
+      // Season averages are shown via seasonAvgPoints/Reb/Ast instead.
+      propLines: [],
     };
   });
 
@@ -334,8 +384,8 @@ export async function fetchSeasonAveragesForGame(
           : g.home_team.abbreviation,
       gameTotal: total,
       teamTotal: teamScore,
-      overUnder: 220,
-      result: total > 220 ? "OVER" : "UNDER",
+      overUnder: projectedTotal,
+      result: total > projectedTotal ? "OVER" : "UNDER",
     };
   });
 
@@ -353,8 +403,8 @@ export async function fetchSeasonAveragesForGame(
           : g.visitor_team.abbreviation,
       gameTotal: total,
       teamTotal: teamScore,
-      overUnder: 220,
-      result: total > 220 ? "OVER" : "UNDER",
+      overUnder: projectedTotal,
+      result: total > projectedTotal ? "OVER" : "UNDER",
     };
   });
 
@@ -393,7 +443,10 @@ export async function fetchSeasonAveragesForGame(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function computeRestDays(recentGames: BdlGame[], gameDate: string): number {
+export function computeRestDays(
+  recentGames: BdlGame[],
+  gameDate: string,
+): number {
   const finals = recentGames
     .filter(
       (g) =>
