@@ -346,29 +346,41 @@ export async function fetchSeasonAveragesForGame(
     fetchTeamLastNGames(bdlGame.visitor_team.id, season, 10),
   ]);
 
-  const homeScores = homeGames
-    .filter((g) => g.home_team_score > 0 || g.visitor_team_score > 0)
-    .map((g) =>
-      g.home_team.id === bdlGame.home_team.id
-        ? g.home_team_score
-        : g.visitor_team_score,
-    );
-  const awayScores = awayGames
-    .filter((g) => g.home_team_score > 0 || g.visitor_team_score > 0)
-    .map((g) =>
-      g.visitor_team.id === bdlGame.visitor_team.id
-        ? g.visitor_team_score
-        : g.home_team_score,
-    );
+  const validHome = homeGames.filter(
+    (g) => g.home_team_score > 0 || g.visitor_team_score > 0,
+  );
+  const validAway = awayGames.filter(
+    (g) => g.home_team_score > 0 || g.visitor_team_score > 0,
+  );
 
-  const homePPG =
-    homeScores.length > 0
-      ? homeScores.reduce((a, b) => a + b, 0) / homeScores.length
-      : 110;
-  const awayPPG =
-    awayScores.length > 0
-      ? awayScores.reduce((a, b) => a + b, 0) / awayScores.length
-      : 110;
+  const homeScores = validHome.map((g) =>
+    g.home_team.id === bdlGame.home_team.id
+      ? g.home_team_score
+      : g.visitor_team_score,
+  );
+  const homeOppScores = validHome.map((g) =>
+    g.home_team.id === bdlGame.home_team.id
+      ? g.visitor_team_score
+      : g.home_team_score,
+  );
+  const awayScores = validAway.map((g) =>
+    g.visitor_team.id === bdlGame.visitor_team.id
+      ? g.visitor_team_score
+      : g.home_team_score,
+  );
+  const awayOppScores = validAway.map((g) =>
+    g.visitor_team.id === bdlGame.visitor_team.id
+      ? g.home_team_score
+      : g.visitor_team_score,
+  );
+
+  const avg = (arr: number[]) =>
+    arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  const homePPG = avg(homeScores) ?? 110;
+  const awayPPG = avg(awayScores) ?? 110;
+  const homeOppPPG = avg(homeOppScores);
+  const awayOppPPG = avg(awayOppScores);
   const projectedTotal = Math.round((homePPG + awayPPG) * 10) / 10;
 
   const homeTrends = homeGames.slice(0, 5).map((g) => {
@@ -413,22 +425,22 @@ export async function fetchSeasonAveragesForGame(
     gameId,
     homePace: {
       teamId: String(bdlGame.home_team.id),
-      pace: 98,
+      pace: 0, // no possession data from BDL free tier
       offensiveEfficiency: homePPG,
-      defensiveEfficiency: 110,
+      defensiveEfficiency: homeOppPPG ?? 0,
       avgPointsFor: homePPG,
-      avgPointsAgainst: 110,
+      avgPointsAgainst: homeOppPPG ?? 0,
       last5Avg:
         homeScores.slice(0, 5).reduce((a, b) => a + b, 0) /
         Math.max(homeScores.slice(0, 5).length, 1),
     },
     awayPace: {
       teamId: String(bdlGame.visitor_team.id),
-      pace: 98,
+      pace: 0,
       offensiveEfficiency: awayPPG,
-      defensiveEfficiency: 110,
+      defensiveEfficiency: awayOppPPG ?? 0,
       avgPointsFor: awayPPG,
-      avgPointsAgainst: 110,
+      avgPointsAgainst: awayOppPPG ?? 0,
       last5Avg:
         awayScores.slice(0, 5).reduce((a, b) => a + b, 0) /
         Math.max(awayScores.slice(0, 5).length, 1),
@@ -478,8 +490,16 @@ function buildTeamStats(
     const isHome = String(g.home_team.id) === teamId;
     return isHome ? g.home_team_score : g.visitor_team_score;
   });
+  const oppScores = finals.slice(0, 5).map((g) => {
+    const isHome = String(g.home_team.id) === teamId;
+    return isHome ? g.visitor_team_score : g.home_team_score;
+  });
   const ppg =
-    scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 110;
+    scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  const oppPPG =
+    oppScores.length > 0
+      ? oppScores.reduce((a, b) => a + b, 0) / oppScores.length
+      : 0;
 
   return {
     teamId,
@@ -488,7 +508,7 @@ function buildTeamStats(
     homeAwayRecord: "",
     pointsPerGame: ppg,
     offensiveRating: ppg,
-    defensiveRating: 110,
-    pace: 98,
+    defensiveRating: oppPPG,
+    pace: 0, // BDL free tier has no possession data — not shown in UI
   };
 }

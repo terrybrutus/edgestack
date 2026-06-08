@@ -1,7 +1,171 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bell, BellOff, CheckCircle2, ExternalLink } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 
+// ── ntfy.sh notification hook ─────────────────────────────────────────────────
+export function useNtfyTopic() {
+  const [topic, setTopic] = useState(
+    () => localStorage.getItem("ntfy_topic") ?? "",
+  );
+  const save = (val: string) => {
+    setTopic(val);
+    if (val.trim()) localStorage.setItem("ntfy_topic", val.trim());
+    else localStorage.removeItem("ntfy_topic");
+  };
+  return { topic, save };
+}
+
+export async function sendNtfyNotification(
+  topic: string,
+  title: string,
+  body: string,
+) {
+  if (!topic) return;
+  try {
+    await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+      method: "POST",
+      headers: { Title: title, Priority: "high", Tags: "money_with_wings" },
+      body,
+    });
+  } catch {
+    // non-critical — notification is best-effort
+  }
+}
+
+// ── Test notification sender ──────────────────────────────────────────────────
+function NtfySection() {
+  const { topic, save } = useNtfyTopic();
+  const [input, setInput] = useState(topic);
+  const [status, setStatus] = useState<"idle" | "sent" | "error">("idle");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSend = async () => {
+    const t = input.trim();
+    if (!t) return;
+    save(t);
+    try {
+      await sendNtfyNotification(
+        t,
+        "EdgeStack — Test Notification",
+        "Notifications are working. You'll be alerted when new plays are detected.",
+      );
+      setStatus("sent");
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch {
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: 0.21 }}
+      className="rounded-xl border border-border/50 bg-card p-4 space-y-4"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-muted/40 border border-border/40 flex items-center justify-center shrink-0">
+          <Bell className="w-4 h-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-sm font-semibold text-foreground">
+            Play Notifications
+          </h3>
+          <p className="text-[11px] font-body text-muted-foreground">
+            Get instant phone alerts when new plays are detected via{" "}
+            <a
+              href="https://ntfy.sh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-0.5"
+            >
+              ntfy.sh
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          </p>
+        </div>
+        {topic ? (
+          <Badge
+            variant="outline"
+            className="text-[10px] font-mono border-primary/40 text-primary bg-primary/5 gap-1.5 shrink-0"
+          >
+            <Bell className="w-3 h-3" />
+            Active
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="text-[10px] font-mono border-border/40 text-muted-foreground gap-1.5 shrink-0"
+          >
+            <BellOff className="w-3 h-3" />
+            Off
+          </Badge>
+        )}
+      </div>
+
+      {/* Setup instructions */}
+      <div className="rounded-lg bg-muted/30 border border-border/30 p-3 space-y-1.5">
+        <p className="text-[11px] font-mono text-muted-foreground font-semibold uppercase tracking-widest">
+          Setup (30 seconds)
+        </p>
+        <ol className="space-y-1 text-[11px] font-mono text-muted-foreground list-none">
+          <li>
+            1. Download the <span className="text-foreground">ntfy</span> app on
+            your phone (iOS / Android — free)
+          </li>
+          <li>
+            2. Pick any unique topic name below — like{" "}
+            <span className="text-primary font-bold">
+              edgestack-terry-plays
+            </span>
+          </li>
+          <li>3. In the ntfy app, subscribe to that same topic name</li>
+          <li>4. Hit "Send Test" — your phone should buzz within seconds</li>
+        </ol>
+      </div>
+
+      {/* Input + test */}
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="your-unique-topic-name"
+          className="flex-1 px-3 py-1.5 rounded-md border border-border/60 bg-background text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 transition-colors"
+        />
+        <Button
+          size="sm"
+          variant={status === "sent" ? "default" : "outline"}
+          onClick={handleSend}
+          disabled={!input.trim()}
+          className="font-mono text-xs shrink-0"
+        >
+          {status === "sent" ? (
+            <>
+              <CheckCircle2 className="w-3 h-3 mr-1.5" />
+              Sent!
+            </>
+          ) : status === "error" ? (
+            "Failed"
+          ) : (
+            "Send Test"
+          )}
+        </Button>
+      </div>
+      {input.trim() !== topic && input.trim() && (
+        <p className="text-[10px] font-mono text-muted-foreground/60">
+          Hit "Send Test" to save and verify this topic.
+        </p>
+      )}
+    </motion.div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const apis = [
     {
@@ -35,20 +199,28 @@ export default function SettingsPage() {
         className="mb-7"
       >
         <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
-          System Status
+          Settings
         </h1>
         <p className="text-sm font-body text-muted-foreground mt-1">
-          All data sources are active and connected.
+          Configure notifications and check data source status.
         </p>
       </motion.div>
 
       <div className="space-y-3">
+        <NtfySection />
+
+        <div className="pt-2 pb-1">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">
+            Data Sources
+          </p>
+        </div>
+
         {apis.map((api, i) => (
           <motion.div
             key={api.name}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, delay: i * 0.07 }}
+            transition={{ duration: 0.25, delay: 0.25 + i * 0.07 }}
             className="rounded-xl border border-border/50 bg-card p-4"
             data-ocid={api.ocid}
           >
@@ -78,11 +250,10 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Info footer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
+        transition={{ duration: 0.3, delay: 0.5 }}
         className="mt-6 px-4 py-3 rounded-lg border border-border/30 bg-muted/20"
       >
         <p className="text-[11px] font-mono text-muted-foreground/80">
