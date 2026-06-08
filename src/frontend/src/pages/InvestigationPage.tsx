@@ -668,6 +668,7 @@ function PlayerPropsTab({
 
 // ─── Pace card ────────────────────────────────────────────────────────────────
 function PaceCard({ pace, teamName }: { pace: PaceProfile; teamName: string }) {
+  const hasRealDef = pace.avgPointsAgainst > 0;
   return (
     <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -678,23 +679,17 @@ function PaceCard({ pace, teamName }: { pace: PaceProfile; teamName: string }) {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <StatCell
-          label="Pace"
-          value={pace.pace.toFixed(1)}
-          sub="possessions/48"
+          label="PPG"
+          value={pace.avgPointsFor > 0 ? pace.avgPointsFor.toFixed(1) : "—"}
         />
         <StatCell
-          label="Off Eff"
-          value={pace.offensiveEfficiency.toFixed(1)}
-          highlight={pace.offensiveEfficiency > 112}
+          label="Opp PPG"
+          value={hasRealDef ? pace.avgPointsAgainst.toFixed(1) : "—"}
         />
         <StatCell
-          label="Def Eff"
-          value={pace.defensiveEfficiency.toFixed(1)}
-          highlight={pace.defensiveEfficiency > 112}
+          label="Last 5 Avg"
+          value={pace.last5Avg > 0 ? pace.last5Avg.toFixed(1) : "—"}
         />
-        <StatCell label="PPG" value={pace.avgPointsFor.toFixed(1)} />
-        <StatCell label="Opp PPG" value={pace.avgPointsAgainst.toFixed(1)} />
-        <StatCell label="Last 5 Avg" value={pace.last5Avg.toFixed(1)} />
       </div>
     </div>
   );
@@ -706,11 +701,13 @@ function GameTotalTab({
   homeTeamName,
   awayTeamName,
   isActiveTab,
+  postedTotal,
 }: {
   gameId: string;
   homeTeamName: string;
   awayTeamName: string;
   isActiveTab: boolean;
+  postedTotal?: number;
 }) {
   const [hasFetched, setHasFetched] = useState(false);
   const shouldFetch = isActiveTab || hasFetched;
@@ -802,7 +799,7 @@ function GameTotalTab({
 
   return (
     <div className="space-y-5">
-      {/* Projected total hero */}
+      {/* Projected total hero + plain-language bet vs posted line */}
       {(total.projectedTotal ?? total.impliedTotal) && (
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
@@ -810,12 +807,68 @@ function GameTotalTab({
           className="rounded-xl border border-primary/30 bg-primary/5 p-6 text-center space-y-2"
         >
           <div className="text-[10px] font-mono uppercase tracking-widest text-primary">
-            Projected Total
+            Model Projection
           </div>
           <div className="font-display font-bold text-5xl text-primary">
             {(total.projectedTotal ?? total.impliedTotal)?.toFixed(1)}
           </div>
-          {report?.overUnderEdge && (
+          {postedTotal != null && total.projectedTotal != null ? (
+            (() => {
+              const gap = total.projectedTotal - postedTotal;
+              const absGap = Math.abs(gap);
+              const lean = gap > 0 ? "OVER" : "UNDER";
+              const isSignificant = absGap >= 2;
+              return (
+                <div className="space-y-2 mt-1">
+                  <div className="flex items-center justify-center gap-3 text-sm font-mono text-muted-foreground">
+                    <span>
+                      FanDuel O/U:{" "}
+                      <span className="text-foreground font-bold">
+                        {postedTotal.toFixed(1)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span>
+                      Gap:{" "}
+                      <span
+                        className={cn(
+                          "font-bold",
+                          gap > 0 ? "text-primary" : "text-accent",
+                        )}
+                      >
+                        {gap > 0 ? "+" : ""}
+                        {gap.toFixed(1)}
+                      </span>
+                    </span>
+                  </div>
+                  {isSignificant ? (
+                    <div
+                      className={cn(
+                        "inline-flex items-center gap-2 px-4 py-2 rounded-lg border font-mono font-bold text-sm",
+                        lean === "OVER"
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-accent/60 bg-accent/15 text-accent",
+                      )}
+                    >
+                      {lean === "OVER" ? (
+                        <TrendingUp className="w-4 h-4" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4" />
+                      )}
+                      Take {lean} {postedTotal.toFixed(1)} on FanDuel
+                      <span className="ml-1 text-[10px] opacity-70">
+                        ({absGap.toFixed(1)} pt gap)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/40 font-mono text-xs text-muted-foreground">
+                      Line gap too small to bet confidently — skip
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : report?.overUnderEdge ? (
             <div
               className={cn(
                 "inline-flex items-center gap-2 px-4 py-1.5 rounded-full border font-mono font-bold text-sm",
@@ -833,7 +886,7 @@ function GameTotalTab({
               )}
               {report.overUnderEdge}
             </div>
-          )}
+          ) : null}
         </motion.div>
       )}
 
@@ -843,36 +896,35 @@ function GameTotalTab({
         <PaceCard pace={total.homePace} teamName={homeTeamName} />
       </div>
 
-      {/* Efficiency comparison bars */}
-      <div className="rounded-xl border border-border/60 bg-card p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <BarChart3 className="w-4 h-4 text-primary" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Efficiency Comparison
-          </span>
+      {/* Scoring comparison bars — only real data */}
+      {(total.homePace.offensiveEfficiency > 0 ||
+        total.awayPace.offensiveEfficiency > 0) && (
+        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Scoring Comparison
+            </span>
+          </div>
+          <EfficiencyBar
+            label="PPG"
+            homeVal={total.homePace.offensiveEfficiency}
+            awayVal={total.awayPace.offensiveEfficiency}
+            homeTeam={homeTeamName}
+            awayTeam={awayTeamName}
+          />
+          {total.homePace.avgPointsAgainst > 0 &&
+            total.awayPace.avgPointsAgainst > 0 && (
+              <EfficiencyBar
+                label="Opp PPG"
+                homeVal={total.homePace.avgPointsAgainst}
+                awayVal={total.awayPace.avgPointsAgainst}
+                homeTeam={homeTeamName}
+                awayTeam={awayTeamName}
+              />
+            )}
         </div>
-        <EfficiencyBar
-          label="Off Eff"
-          homeVal={total.homePace.offensiveEfficiency}
-          awayVal={total.awayPace.offensiveEfficiency}
-          homeTeam={homeTeamName}
-          awayTeam={awayTeamName}
-        />
-        <EfficiencyBar
-          label="Def Eff"
-          homeVal={total.homePace.defensiveEfficiency}
-          awayVal={total.awayPace.defensiveEfficiency}
-          homeTeam={homeTeamName}
-          awayTeam={awayTeamName}
-        />
-        <EfficiencyBar
-          label="Pace"
-          homeVal={total.homePace.pace}
-          awayVal={total.awayPace.pace}
-          homeTeam={homeTeamName}
-          awayTeam={awayTeamName}
-        />
-      </div>
+      )}
 
       {/* Scoring trends */}
       {(homeTrends.length > 0 || awayTrends.length > 0) && (
@@ -1955,6 +2007,9 @@ export default function InvestigationPage() {
   const { game, injuries } = investigation;
   const homeTeam = game.homeTeam;
   const awayTeam = game.awayTeam;
+  const postedTotal = investigation.odds[0]?.overUnder
+    ? Number(investigation.odds[0].overUnder)
+    : undefined;
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-0">
@@ -2092,6 +2147,7 @@ export default function InvestigationPage() {
             homeTeamName={teamFullName(homeTeam.city, homeTeam.name)}
             awayTeamName={teamFullName(awayTeam.city, awayTeam.name)}
             isActiveTab={activeTab === "total"}
+            postedTotal={postedTotal}
           />
         )}
         {activeTab === "odds" && <AllOddsTab investigation={investigation} />}

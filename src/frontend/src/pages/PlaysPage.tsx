@@ -1,6 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { type AnyPlay, usePlays } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
+import { sendNtfyNotification } from "@/pages/SettingsPage";
 import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
@@ -11,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
 function ConfidenceBadge({ value }: { value: number }) {
@@ -51,15 +53,41 @@ function SportBadge({ sport }: { sport: "NBA" | "MLB" }) {
 
 // ── Play card ─────────────────────────────────────────────────────────────────
 function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
+  const isHot = play.confidence >= 75;
+  const isSolid = play.confidence >= 65 && !isHot;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: index * 0.07 }}
-      className="rounded-xl border border-border/60 bg-card overflow-hidden group"
+      className={cn(
+        "rounded-xl border overflow-hidden",
+        isHot
+          ? "border-primary/60 bg-primary/5 shadow-[0_0_24px_-4px_oklch(var(--primary)/0.25)]"
+          : isSolid
+            ? "border-accent/40 bg-accent/5"
+            : "border-border/60 bg-card",
+      )}
     >
-      {/* Accent bar */}
-      <div className="h-[2px] bg-gradient-to-r from-primary/60 via-primary/30 to-transparent" />
+      {/* Accent bar — thicker & brighter for hot plays */}
+      <div
+        className={cn(
+          "bg-gradient-to-r to-transparent",
+          isHot
+            ? "h-[3px] from-primary via-primary/60"
+            : "h-[2px] from-primary/60 via-primary/30",
+        )}
+      />
+
+      {isHot && (
+        <div className="flex items-center gap-2 px-5 pt-3 pb-0">
+          <Zap className="w-3.5 h-3.5 text-primary animate-pulse" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-primary font-bold">
+            High Confidence Play
+          </span>
+        </div>
+      )}
 
       <div className="p-5 space-y-4">
         {/* Badges row */}
@@ -71,12 +99,17 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           </span>
         </div>
 
-        {/* Bet text */}
+        {/* Bet text — larger for hot plays */}
         <div>
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-1">
-            FanDuel Play
+            Bet on FanDuel
           </p>
-          <p className="font-display text-2xl font-bold text-foreground tracking-tight">
+          <p
+            className={cn(
+              "font-display font-bold text-foreground tracking-tight",
+              isHot ? "text-3xl" : "text-2xl",
+            )}
+          >
             {play.betText}
           </p>
           <p className="text-xs font-mono text-muted-foreground/70 mt-1">
@@ -88,11 +121,16 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
         {play.signals.length > 0 && (
           <div className="space-y-1.5 pt-1 border-t border-border/30">
             <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/50 mb-2">
-              Evidence
+              Why this bet
             </p>
             {play.signals.slice(0, 3).map((sig) => (
               <div key={sig.name} className="flex items-start gap-2">
-                <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                <span
+                  className={cn(
+                    "w-1 h-1 rounded-full mt-1.5 shrink-0",
+                    isHot ? "bg-primary" : "bg-muted-foreground/60",
+                  )}
+                />
                 <div className="min-w-0">
                   <span className="text-[10px] font-mono text-primary mr-1.5">
                     {sig.name}:
@@ -223,6 +261,7 @@ function EmptyState() {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlaysPage() {
   const { data, isLoading, isError, error } = usePlays();
+  const prevCountRef = useRef<number>(-1);
 
   const todayLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -234,6 +273,33 @@ export default function PlaysPage() {
   const nbaPlays = data?.nbaPlays ?? [];
   const mlbPlays = data?.mlbPlays ?? [];
   const totalPlays = nbaPlays.length + mlbPlays.length;
+
+  // Notify via ntfy.sh when new plays appear
+  useEffect(() => {
+    if (!data || totalPlays === 0) return;
+    const prev = prevCountRef.current;
+    if (prev === -1) {
+      // First load — set baseline without notifying
+      prevCountRef.current = totalPlays;
+      return;
+    }
+    if (totalPlays > prev) {
+      prevCountRef.current = totalPlays;
+      const topic = localStorage.getItem("ntfy_topic");
+      if (topic) {
+        const allPlays = [...nbaPlays, ...mlbPlays];
+        const newPlays = allPlays.slice(0, totalPlays - prev);
+        const body = newPlays
+          .map((p) => `• ${p.betText} (${p.confidence}% conf)`)
+          .join("\n");
+        sendNtfyNotification(
+          topic,
+          `EdgeStack — ${totalPlays - prev} new play${totalPlays - prev > 1 ? "s" : ""}`,
+          body,
+        );
+      }
+    }
+  }, [totalPlays, data, nbaPlays, mlbPlays]);
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 py-6">
