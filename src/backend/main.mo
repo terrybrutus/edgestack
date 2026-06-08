@@ -16,7 +16,7 @@ actor {
   let lineOpenStore : Map.Map<Text, Text>;
 
   // Retained for stable variable compatibility with previous canister version.
-  let OPENAI_API_KEY : Text;
+  let _OPENAI_API_KEY : Text;
 
   // ── Bet history ───────────────────────────────────────────────────────────
 

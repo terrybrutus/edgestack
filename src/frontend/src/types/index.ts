@@ -3,71 +3,236 @@ import {
   type BetRecommendation,
   BetStatus,
   BetType,
-  type GamesResponse,
-} from "@/backend";
-import type {
-  ApiError,
-  ApiStatus,
-  ConfidenceReport,
-  Discrepancy,
-  Game,
-  GameId,
-  GameInvestigation,
-  GameStatus,
-  GameTotal,
-  InjuryReport,
-  LineMovement,
-  OddsLine,
-  PaceProfile,
-  Player,
-  PlayerId,
-  PlayerProp,
-  PlayerPropsAnalysis,
-  PlayerRecentGame,
-  PropLine,
-  RefereeProfile,
-  RestAdvantage,
-  ScoringTrend,
-  SituationalAngle,
-  Team,
-  TeamId,
-  TeamStats,
-  TotalsConfidenceReport,
+  type ApiError,
+  type ApiStatus,
+  type GameId,
 } from "@/backend";
 
-export type {
-  Game,
-  Team,
-  GameStatus,
-  OddsLine,
-  Discrepancy,
-  GameInvestigation,
-  LineMovement,
-  RestAdvantage,
-  SituationalAngle,
-  PlayerProp,
-  PropLine,
-  PlayerRecentGame,
-  ConfidenceReport,
-  PlayerPropsAnalysis,
-  GameTotal,
-  PaceProfile,
-  ScoringTrend,
-  InjuryReport,
-  TeamStats,
-  TotalsConfidenceReport,
-  RefereeProfile,
-  ApiError,
-  ApiStatus,
-  Player,
-  GameId,
-  TeamId,
-  PlayerId,
-  BetRecommendation,
-  BetHistoryStats,
-  GamesResponse,
-};
+export type { BetRecommendation, BetHistoryStats, ApiError, ApiStatus, GameId };
 export { BetStatus, BetType };
+
+// ── Domain types (frontend-only after backend refactor) ───────────────────────
+
+export type TeamId = string;
+export type PlayerId = string;
+
+export enum GameStatus {
+  final_ = "final",
+  scheduled = "scheduled",
+  inProgress = "inProgress",
+  postponed = "postponed",
+}
+
+export interface Team {
+  id: TeamId;
+  city: string;
+  name: string;
+  abbreviation: string;
+  record: string;
+}
+
+export interface OddsLine {
+  homeMoneyline?: bigint;
+  overUnder?: number;
+  awaySpreadOdds?: bigint;
+  awayMoneyline?: bigint;
+  overOdds?: bigint;
+  awaySpread?: number;
+  homeSpreadOdds?: bigint;
+  homeSpread?: number;
+  bookmaker: string;
+  underOdds?: bigint;
+  updatedAt: string;
+}
+
+export interface Game {
+  id: GameId;
+  status: GameStatus;
+  venue: string;
+  displayTime: string;
+  homeTeam: Team;
+  odds: Array<OddsLine>;
+  series?: string;
+  awayTeam: Team;
+  gameTime: string;
+}
+
+export interface GamesResponse {
+  gamesDate: string;
+  isUpcomingDate: boolean;
+  games: Array<Game>;
+}
+
+export interface InjuryReport {
+  status: string;
+  playerId: PlayerId;
+  team: string;
+  description: string;
+  updatedAt: string;
+  playerName: string;
+}
+
+export interface Discrepancy {
+  gap: number;
+  minValue: number;
+  minBook: string;
+  betType: string;
+  maxBook: string;
+  maxValue: number;
+}
+
+export interface TeamStats {
+  pace?: number;
+  recentForm: Array<bigint>;
+  homeAwayRecord: string;
+  defensiveRating?: number;
+  teamId: TeamId;
+  restDays: bigint;
+  offensiveRating?: number;
+  pointsPerGame?: number;
+}
+
+export interface LineMovement {
+  openingSpread?: number;
+  currentSpread?: number;
+  spreadMove: number;
+  openingTotal?: number;
+  currentTotal?: number;
+  totalMove: number;
+  steamAlert: boolean;
+  sharpSide: string;
+}
+
+export interface RestAdvantage {
+  homeRestDays: bigint;
+  awayRestDays: bigint;
+  advantage: string;
+  impactDescription: string;
+}
+
+export interface SituationalAngle {
+  name: string;
+  description: string;
+  edge: string;
+  confidence: bigint;
+}
+
+export interface RefereeProfile {
+  overRate?: number;
+  name: string;
+  avgFoulsPerGame?: number;
+  avgFreeThrowsPerGame?: number;
+  tendency: string;
+}
+
+export interface GameInvestigation {
+  game: Game;
+  odds: Array<OddsLine>;
+  injuries: Array<InjuryReport>;
+  discrepancies: Array<Discrepancy>;
+  homeTeamStats: TeamStats;
+  awayTeamStats: TeamStats;
+  lineMovement?: LineMovement;
+  restAdvantage?: RestAdvantage;
+  situationalAngles: Array<SituationalAngle>;
+  refereeProfile?: RefereeProfile;
+}
+
+export interface Player {
+  id: PlayerId;
+  name: string;
+  team: string;
+  jerseyNumber: string;
+  injuryStatus: string;
+  position: string;
+}
+
+export interface PropLine {
+  overOdds: bigint;
+  line: number;
+  bookmaker: string;
+  underOdds: bigint;
+}
+
+export interface PlayerRecentGame {
+  fieldGoalAttempts: number;
+  date: string;
+  minutes: number;
+  usageRate: number;
+  points: number;
+  opponent: string;
+}
+
+export interface ConfidenceReport {
+  keyFactors: Array<string>;
+  projectedPoints?: number;
+  reasoning: string;
+  score: bigint;
+  grade: string;
+  recommendation: string;
+}
+
+export interface PlayerProp {
+  seasonAvgPoints: number;
+  player: Player;
+  seasonUsageRate: number;
+  matchupDefRating?: number;
+  seasonAvgMinutes: number;
+  propLines: Array<PropLine>;
+  confidenceReport?: ConfidenceReport;
+  backToBack: boolean;
+  recentGames: Array<PlayerRecentGame>;
+  homeAwaySplit: number;
+}
+
+export interface PlayerPropsAnalysis {
+  gameId: GameId;
+  players: Array<PlayerProp>;
+  analysisGeneratedAt: string;
+}
+
+export interface PaceProfile {
+  defensiveEfficiency: number;
+  pace: number;
+  avgPointsAgainst: number;
+  avgPointsFor: number;
+  offensiveEfficiency: number;
+  teamId: TeamId;
+  last5Avg: number;
+}
+
+export interface ScoringTrend {
+  result: string;
+  overUnder: number;
+  teamTotal: number;
+  date: string;
+  gameTotal: number;
+  opponent: string;
+}
+
+export interface TotalsConfidenceReport {
+  overUnderEdge: string;
+  keyFactors: Array<string>;
+  reasoning: string;
+  score: bigint;
+  projectedTotal?: number;
+  grade: string;
+  recommendation: string;
+}
+
+export interface GameTotal {
+  homePace: PaceProfile;
+  gameId: GameId;
+  refereeProfile?: RefereeProfile;
+  impliedTotal?: number;
+  projectedTotal?: number;
+  recentTrends: Array<ScoringTrend>;
+  confidenceReport?: TotalsConfidenceReport;
+  awayPace: PaceProfile;
+  injuryImpact: string;
+}
+
+// ── Utility types ─────────────────────────────────────────────────────────────
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 

@@ -417,21 +417,9 @@ export interface backendInterface {
     getApiStatus(): Promise<ApiStatus>;
     getBetHistory(): Promise<Array<BetRecommendation>>;
     getBetHistoryStats(): Promise<BetHistoryStats>;
-    getGameInvestigation(gameId: GameId, gameDate: string): Promise<Result_6>;
-    getGameTotalsAnalysis(gameId: GameId, homeTeamName: string, awayTeamName: string): Promise<Result_5>;
-    getMultiBookOdds(gameId: GameId): Promise<Result_4>;
-    getPlayerPropsAnalysis(gameId: GameId): Promise<Result_3>;
-    getPropsAIAnalysis(gameId: string, playerData: string): Promise<string>;
-    getTodaysGames(): Promise<Result_2>;
-    getTotalsAIAnalysis(gameId: string, totalsData: string): Promise<string>;
-    isBdlApiConfigured(): Promise<boolean>;
-    isOddsApiConfigured(): Promise<boolean>;
-    isOpenAIConfigured(): Promise<boolean>;
+    getOpeningLine(gameId: string): Promise<string | undefined>;
+    recordOpeningLine(gameId: string, spread: string, total: string, homeML: string): Promise<void>;
     saveBetRecommendation(rec: BetRecommendation): Promise<Result_1>;
-    setBdlApiKey(_key: string): Promise<void>;
-    setOddsApiKey(_key: string): Promise<void>;
-    setOpenAIApiKey(_key: string): Promise<void>;
-    transform(input: TransformationInput): Promise<TransformationOutput>;
     updateBetOutcome(id: string, status: BetStatus, gameResult: string | null): Promise<Result>;
     updateClosingLine(id: string, closingLine: string, preGameLine: string): Promise<Result>;
 }
