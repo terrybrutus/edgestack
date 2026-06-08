@@ -1,8 +1,8 @@
-import type { backendInterface } from "../backend";
-
 // Minimal mock — only canister methods (bet history + line movement).
 // Game data, odds, props, and AI analysis all come from external APIs in the browser.
-export const mockBackend: backendInterface = {
+// Not currently used at runtime; kept as a reference implementation.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const mockBackend = {
   getApiStatus: async () => ({
     oddsApiConfigured: true,
     openAiConfigured: true,
