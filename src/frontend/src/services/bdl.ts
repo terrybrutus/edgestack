@@ -2,6 +2,68 @@ import { CONFIG } from "./config";
 
 const headers = () => ({ Authorization: `Bearer ${CONFIG.BDL_API_KEY}` });
 
+// ── Rate-limited fetch with in-memory cache ───────────────────────────────────
+// BDL free tier: 60 req/min. We throttle to ≤1 req/sec to stay safe.
+const cache = new Map<string, { data: unknown; at: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 min — games don't change that fast
+const queue: Array<() => void> = [];
+let lastReqAt = 0;
+const MIN_INTERVAL = 1050; // ~57 req/min, safe margin
+
+function scheduleNext() {
+  if (queue.length === 0) return;
+  const now = Date.now();
+  const wait = Math.max(0, lastReqAt + MIN_INTERVAL - now);
+  setTimeout(() => {
+    const next = queue.shift();
+    if (next) {
+      lastReqAt = Date.now();
+      next();
+      scheduleNext();
+    }
+  }, wait);
+}
+
+async function bdlFetch(url: string): Promise<unknown> {
+  const cached = cache.get(url);
+  if (cached && Date.now() - cached.at < CACHE_TTL) return cached.data;
+
+  return new Promise((resolve, reject) => {
+    queue.push(async () => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const res = await fetch(url, { headers: headers() });
+          if (res.status === 429) {
+            // Back off: 2s, 4s, 8s
+            await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt + 1)));
+            continue;
+          }
+          if (!res.ok) {
+            reject(
+              new Error(
+                `BDL ${url.split("?")[0].split("/").pop()} failed: ${res.status}`,
+              ),
+            );
+            return;
+          }
+          const json = await res.json();
+          cache.set(url, { data: json, at: Date.now() });
+          resolve(json);
+          return;
+        } catch (e) {
+          if (attempt === 3) {
+            reject(e);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+      reject(new Error("BDL max retries exceeded"));
+    });
+    if (queue.length === 1) scheduleNext();
+  });
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface BdlTeam {
@@ -68,9 +130,7 @@ export interface BdlSeasonAvg {
 
 export async function fetchGamesForDate(date: string): Promise<BdlGame[]> {
   const url = `${CONFIG.BDL_BASE}/games?dates[]=${date}&per_page=100`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`BDL games failed: ${res.status}`);
-  const json = await res.json();
+  const json = (await bdlFetch(url)) as { data?: BdlGame[] };
   return json.data ?? [];
 }
 
@@ -80,9 +140,7 @@ export async function fetchTeamLastNGames(
   n = 10,
 ): Promise<BdlGame[]> {
   const url = `${CONFIG.BDL_BASE}/games?team_ids[]=${teamId}&seasons[]=${season}&per_page=${n}`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`BDL team games failed: ${res.status}`);
-  const json = await res.json();
+  const json = (await bdlFetch(url)) as { data?: BdlGame[] };
   return (json.data ?? []) as BdlGame[];
 }
 
@@ -90,9 +148,7 @@ export async function fetchPlayerStatsForGame(
   gameId: number,
 ): Promise<BdlStat[]> {
   const url = `${CONFIG.BDL_BASE}/stats?game_ids[]=${gameId}&per_page=100`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`BDL stats failed: ${res.status}`);
-  const json = await res.json();
+  const json = (await bdlFetch(url)) as { data?: BdlStat[] };
   return json.data ?? [];
 }
 
@@ -102,17 +158,13 @@ export async function fetchSeasonAverages(
 ): Promise<BdlSeasonAvg[]> {
   const ids = playerIds.map((id) => `player_ids[]=${id}`).join("&");
   const url = `${CONFIG.BDL_BASE}/season_averages?season=${season}&${ids}`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`BDL season avgs failed: ${res.status}`);
-  const json = await res.json();
+  const json = (await bdlFetch(url)) as { data?: BdlSeasonAvg[] };
   return json.data ?? [];
 }
 
 export async function fetchActivePlayers(teamId: number): Promise<BdlPlayer[]> {
   const url = `${CONFIG.BDL_BASE}/players/active?team_ids[]=${teamId}&per_page=50`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`BDL players failed: ${res.status}`);
-  const json = await res.json();
+  const json = (await bdlFetch(url)) as { data?: BdlPlayer[] };
   return json.data ?? [];
 }
 

@@ -79,10 +79,10 @@ export function useTodayGames() {
       }
       return { games: [], gamesDate: localToday, isUpcomingDate: false };
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000, // 5 min — BDL game list doesn't change every 2 min
     retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
   });
 }
 
@@ -424,9 +424,10 @@ export function useMlbGames(date?: string) {
       );
       return cards;
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
     retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
   });
 }
 
@@ -710,8 +711,9 @@ export function usePlays() {
 
       return { nbaPlays, mlbPlays };
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 10 * 60_000,
+    refetchInterval: 10 * 60_000,
     retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
   });
 }
