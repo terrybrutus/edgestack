@@ -449,6 +449,9 @@ export interface AnyPlay {
   gameId: string;
   displayTime: string;
   betText: string;
+  betType: "spread" | "total" | "moneyline";
+  postedLine: number | null; // the actual number to bet (spread/total)
+  direction: "OVER" | "UNDER" | "HOME" | "AWAY";
   confidence: number;
   convergenceCount: number;
   summaryText: string;
@@ -648,12 +651,32 @@ export function usePlays() {
             displayTime = "LIVE";
           }
 
+          const nbaBetType: AnyPlay["betType"] =
+            rec === "OVER" || rec === "UNDER"
+              ? "total"
+              : rec === "HOME" || rec === "AWAY"
+                ? parsedOdds?.homeSpread != null
+                  ? "spread"
+                  : "moneyline"
+                : "moneyline";
+          const nbaPostedLine =
+            nbaBetType === "total"
+              ? (parsedOdds?.total ?? null)
+              : nbaBetType === "spread"
+                ? rec === "HOME"
+                  ? (parsedOdds?.homeSpread ?? null)
+                  : (parsedOdds?.awaySpread ?? null)
+                : null;
+
           nbaPlays.push({
             sport: "NBA",
             gameLabel: `${g.visitor_team.abbreviation} @ ${g.home_team.abbreviation}`,
             gameId: String(g.id),
             displayTime,
             betText,
+            betType: nbaBetType,
+            postedLine: nbaPostedLine,
+            direction: rec,
             confidence,
             convergenceCount: topCount,
             summaryText: `${topCount} signal${topCount > 1 ? "s" : ""} converging ${topDir} — ${topCount >= 3 ? "high" : "moderate"} conviction`,
@@ -676,14 +699,40 @@ export function usePlays() {
         await import("@/services/mlb");
       const { fetchStadiumWeather } = await import("@/services/weather");
 
-      const mlbGamesRaw = await fetchMlb(today).catch(() => []);
+      const [mlbGamesRaw, mlbOddsResult] = await Promise.allSettled([
+        fetchMlb(today),
+        fetchOdds("baseball_mlb"),
+      ]);
+      const mlbGames =
+        mlbGamesRaw.status === "fulfilled" ? mlbGamesRaw.value : [];
+      const mlbOddsEvents =
+        mlbOddsResult.status === "fulfilled" ? mlbOddsResult.value : [];
       const mlbPlays: AnyPlay[] = [];
 
       await Promise.all(
-        mlbGamesRaw.map(async (g) => {
+        mlbGames.map(async (g) => {
           const season = new Date(g.gameDate).getFullYear();
           const venueName = g.venue.name;
           const park = getPF(venueName);
+
+          // Find matching odds event for this MLB game
+          const mlbOddsEvent = mlbOddsEvents.find(
+            (e) =>
+              e.home_team
+                .toLowerCase()
+                .includes(
+                  g.teams.home.team.name.toLowerCase().split(" ").pop() ?? "",
+                ) ||
+              e.away_team
+                .toLowerCase()
+                .includes(
+                  g.teams.away.team.name.toLowerCase().split(" ").pop() ?? "",
+                ),
+          );
+          const mlbParsedOdds = mlbOddsEvent
+            ? parseOddsEvent(mlbOddsEvent)
+            : null;
+          const mlbTotal = mlbParsedOdds?.total ?? null;
           const [homePitcherStats, awayPitcherStats, wx] =
             await Promise.allSettled([
               g.teams.home.probablePitcher
@@ -763,12 +812,23 @@ export function usePlays() {
           const homeAbbr = g.teams.home.team.abbreviation;
           const awayAbbr = g.teams.away.team.abbreviation;
           let betText = "";
-          if (topDir === "OVER") betText = `Over — ${g.venue.name}`;
-          else if (topDir === "UNDER") betText = `Under — ${g.venue.name}`;
+          if (topDir === "OVER")
+            betText =
+              mlbTotal != null
+                ? `Over ${mlbTotal} runs on FanDuel`
+                : `Over (runs O/U) — ${g.venue.name}`;
+          else if (topDir === "UNDER")
+            betText =
+              mlbTotal != null
+                ? `Under ${mlbTotal} runs on FanDuel`
+                : `Under (runs O/U) — ${g.venue.name}`;
           else if (topDir === "HOME") betText = `${homeAbbr} ML on FanDuel`;
           else betText = `${awayAbbr} ML on FanDuel`;
 
           const displayTime = mlbTime(g);
+
+          const mlbBetType: AnyPlay["betType"] =
+            topDir === "OVER" || topDir === "UNDER" ? "total" : "moneyline";
 
           mlbPlays.push({
             sport: "MLB",
@@ -776,6 +836,9 @@ export function usePlays() {
             gameId: String(g.gamePk),
             displayTime,
             betText,
+            betType: mlbBetType,
+            postedLine: mlbBetType === "total" ? mlbTotal : null,
+            direction: topDir as "OVER" | "UNDER" | "HOME" | "AWAY",
             confidence,
             convergenceCount: topCount,
             summaryText: `${topCount} signals converging on ${topDir} — ${topCount >= 3 ? "high" : "moderate"} conviction`,
