@@ -339,47 +339,68 @@ async function fetchActivePlayersForGameInner(
   }
   if (!bdlGame) return emptyResult;
 
-  const [homePlayers, awayPlayers] = await Promise.all([
-    fetchActivePlayers(bdlGame.home_team.id).catch(() => []),
-    fetchActivePlayers(bdlGame.visitor_team.id).catch(() => []),
+  const season = bdlGame.season;
+
+  // Fetch prop lines from Odds API first (single fast request — this is the
+  // primary data source for betting decisions).
+  const { fetchPlayerPropsFromOdds } = await import("./odds");
+  const [homePlayers, awayPlayers, oddsProps] = await Promise.all([
+    fetchActivePlayers(bdlGame.home_team.id, season).catch(() => []),
+    fetchActivePlayers(bdlGame.visitor_team.id, season).catch(() => []),
+    fetchPlayerPropsFromOdds(
+      bdlGame.home_team.name,
+      bdlGame.visitor_team.name,
+    ).catch(() => []),
   ]);
 
-  const allPlayers = [...homePlayers, ...awayPlayers].slice(
+  // If the Odds API returned prop lines, use those player names as the primary
+  // roster — they're guaranteed to be current-season players with active lines.
+  // Merge in BDL players for stat enrichment only.
+  const oddsPlayerNames = new Set(
+    oddsProps.map((op) => op.playerName.toLowerCase()),
+  );
+
+  // Build a lookup from last name → BDL player (for stat enrichment)
+  const bdlByLastName = new Map(
+    [...homePlayers, ...awayPlayers].map((p) => [p.last_name.toLowerCase(), p]),
+  );
+
+  // Fetch season averages for BDL players we actually found
+  const enrichablePlayers = [...homePlayers, ...awayPlayers].slice(
     0,
     MAX_ENRICHED_PLAYERS,
   );
-  const playerIds = allPlayers.map((p) => p.id);
+  const playerIds = enrichablePlayers.map((p) => p.id);
   const avgs =
     playerIds.length > 0
-      ? await fetchSeasonAverages(playerIds, bdlGame.season).catch(() => [])
+      ? await fetchSeasonAverages(playerIds, season).catch(() => [])
       : [];
-  const avgMap = new Map(avgs.map((a) => [a.player_id, a]));
+  const avgByPlayerId = new Map(avgs.map((a) => [a.player_id, a]));
 
-  const { fetchPlayerPropsFromOdds } = await import("./odds");
-  const oddsProps = await fetchPlayerPropsFromOdds(
-    bdlGame.home_team.name,
-    bdlGame.visitor_team.name,
-  ).catch(() => []);
+  // Build prop-first player list: one entry per unique playerName from Odds API,
+  // enriched with BDL stats when available.
+  const propPlayerNames = [...new Set(oddsProps.map((op) => op.playerName))];
 
-  const props = allPlayers.map((p) => {
-    const avg = avgMap.get(p.id);
-    const playerOddsLines = oddsProps.filter((op) =>
-      op.playerName.toLowerCase().includes(p.last_name.toLowerCase()),
-    );
-    const lines = playerOddsLines.map((op) => ({
-      bookmaker: op.bookmaker,
-      line: op.line,
-      overOdds: BigInt(op.overOdds),
-      underOdds: BigInt(op.underOdds),
-    }));
+  const propsFromOdds = propPlayerNames.map((name) => {
+    const lastName = name.split(" ").pop()?.toLowerCase() ?? "";
+    const bdlPlayer = bdlByLastName.get(lastName);
+    const avg = bdlPlayer ? avgByPlayerId.get(bdlPlayer.id) : undefined;
+    const lines = oddsProps
+      .filter((op) => op.playerName === name)
+      .map((op) => ({
+        bookmaker: op.bookmaker,
+        line: op.line,
+        overOdds: BigInt(op.overOdds),
+        underOdds: BigInt(op.underOdds),
+      }));
     return {
       player: {
-        id: String(p.id),
-        name: `${p.first_name} ${p.last_name}`,
-        team: p.team.abbreviation,
+        id: bdlPlayer ? String(bdlPlayer.id) : name,
+        name,
+        team: bdlPlayer?.team.abbreviation ?? "",
         jerseyNumber: "",
         injuryStatus: "Active",
-        position: p.position,
+        position: bdlPlayer?.position ?? "",
       },
       seasonAvgPoints: avg?.pts ?? 0,
       seasonAvgMinutes: Number.parseFloat(avg?.min ?? "0") || 0,
@@ -391,9 +412,38 @@ async function fetchActivePlayersForGameInner(
     };
   });
 
+  // Also include BDL players with real stats (pts > 0) who weren't in the Odds
+  // lines — so the tab shows a fuller roster picture even without prop lines.
+  const bdlOnlyPlayers = enrichablePlayers
+    .filter((p) => !oddsPlayerNames.has(p.last_name.toLowerCase()))
+    .map((p) => {
+      const avg = avgByPlayerId.get(p.id);
+      if (!avg || avg.pts === 0) return null; // skip zero-stat / historical players
+      return {
+        player: {
+          id: String(p.id),
+          name: `${p.first_name} ${p.last_name}`,
+          team: p.team.abbreviation,
+          jerseyNumber: "",
+          injuryStatus: "Active",
+          position: p.position,
+        },
+        seasonAvgPoints: avg.pts,
+        seasonAvgMinutes: Number.parseFloat(avg.min ?? "0") || 0,
+        seasonUsageRate: 0,
+        homeAwaySplit: 0,
+        backToBack: false,
+        recentGames: [],
+        propLines: [] as PropLine[],
+      };
+    })
+    .filter(Boolean);
+
+  const players = [...propsFromOdds, ...bdlOnlyPlayers] as typeof propsFromOdds;
+
   return {
     gameId,
-    players: props,
+    players,
     analysisGeneratedAt: new Date().toISOString(),
   };
 }

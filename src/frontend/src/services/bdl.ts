@@ -138,9 +138,12 @@ export async function fetchSeasonAverages(
   return json.data ?? [];
 }
 
-export async function fetchActivePlayers(teamId: number): Promise<BdlPlayer[]> {
-  // BDL v1 has no /players/active endpoint — use /players with team filter
-  const url = `${CONFIG.BDL_BASE}/players?team_ids[]=${teamId}&per_page=50`;
+export async function fetchActivePlayers(
+  teamId: number,
+  season: number,
+): Promise<BdlPlayer[]> {
+  // Filter by season so we only get the current-year roster, not all-time history.
+  const url = `${CONFIG.BDL_BASE}/players?team_ids[]=${teamId}&seasons[]=${season}&per_page=100`;
   const json = (await bdlFetch(url)) as { data?: BdlPlayer[] };
   return json.data ?? [];
 }
