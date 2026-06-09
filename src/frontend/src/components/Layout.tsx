@@ -2,9 +2,10 @@ import { Button } from "@/components/ui/button";
 import {
   useIsOddsApiConfigured,
   useIsOpenAIConfigured,
+  usePlays,
 } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
-import { Link } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
   Activity,
   BookOpen,
@@ -12,6 +13,7 @@ import {
   Settings,
   TrendingUp,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,6 +23,32 @@ interface LayoutProps {
 export function Layout({ children, className }: LayoutProps) {
   const { data: isOpenAiConfigured } = useIsOpenAIConfigured();
   const { data: isOddsConfigured } = useIsOddsApiConfigured();
+  const { data: plays } = usePlays();
+  const matchRoute = useMatchRoute();
+  const isOnPlays = !!matchRoute({ to: "/plays" });
+
+  const [lastSeenCount, setLastSeenCount] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem("plays_last_seen_count") ?? "0");
+    } catch {
+      return 0;
+    }
+  });
+
+  const playsCount =
+    (plays?.nbaPlays.length ?? 0) + (plays?.mlbPlays.length ?? 0);
+  const hasUnreadPlays = playsCount > lastSeenCount;
+
+  useEffect(() => {
+    if (isOnPlays) {
+      setLastSeenCount(playsCount);
+      try {
+        localStorage.setItem("plays_last_seen_count", String(playsCount));
+      } catch {
+        // ignore
+      }
+    }
+  }, [isOnPlays, playsCount]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -100,9 +128,12 @@ export function Layout({ children, className }: LayoutProps) {
               asChild
               data-ocid="nav.plays_button"
             >
-              <Link to="/plays">
+              <Link to="/plays" className="relative flex items-center gap-1.5">
                 <Crosshair className="w-3.5 h-3.5" />
                 Plays
+                {hasUnreadPlays && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
               </Link>
             </Button>
             <Button

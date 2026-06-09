@@ -1,3 +1,4 @@
+import { BetStatus, BetType } from "@/backend";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { InjuryBadge } from "@/components/InjuryBadge";
 import { OddsCard } from "@/components/OddsCard";
@@ -9,6 +10,7 @@ import {
   useGameTotal,
   usePlayerProps,
   usePropsAIAnalysis,
+  useSaveBetRecommendation,
   useTotalsAIAnalysis,
 } from "@/hooks/useBackend";
 import { cn, teamFullName } from "@/lib/utils";
@@ -30,6 +32,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   BarChart3,
@@ -711,6 +714,10 @@ function GameTotalTab({
   postedTotal?: number;
 }) {
   const [hasFetched, setHasFetched] = useState(false);
+  const [logState, setLogState] = useState<"idle" | "pending" | "logged">(
+    "idle",
+  );
+  const saveBet = useSaveBetRecommendation();
   const shouldFetch = isActiveTab || hasFetched;
   const { data, isLoading, isError, refetch } = useGameTotal(
     gameId,
@@ -843,24 +850,67 @@ function GameTotalTab({
                     </span>
                   </div>
                   {isSignificant ? (
-                    <div
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-lg border font-mono font-bold text-sm",
-                        lean === "OVER"
-                          ? "border-primary/60 bg-primary/15 text-primary"
-                          : "border-accent/60 bg-accent/15 text-accent",
-                      )}
-                    >
-                      {lean === "OVER" ? (
-                        <TrendingUp className="w-4 h-4" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4" />
-                      )}
-                      Take {lean} {postedTotal.toFixed(1)} on FanDuel
-                      <span className="ml-1 text-[10px] opacity-70">
-                        ({absGap.toFixed(1)} pt gap)
-                      </span>
-                    </div>
+                    <>
+                      <div
+                        className={cn(
+                          "inline-flex items-center gap-2 px-4 py-2 rounded-lg border font-mono font-bold text-sm",
+                          lean === "OVER"
+                            ? "border-primary/60 bg-primary/15 text-primary"
+                            : "border-accent/60 bg-accent/15 text-accent",
+                        )}
+                      >
+                        {lean === "OVER" ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        Take {lean} {postedTotal.toFixed(1)} on FanDuel
+                        <span className="ml-1 text-[10px] opacity-70">
+                          ({absGap.toFixed(1)} pt gap)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={logState !== "idle"}
+                        onClick={() => {
+                          setLogState("pending");
+                          saveBet.mutate(
+                            {
+                              id: crypto.randomUUID(),
+                              gameId,
+                              status: BetStatus.pending,
+                              betType: BetType.gameTotal,
+                              homeTeam: homeTeamName,
+                              awayTeam: awayTeamName,
+                              gameDate: new Date().toLocaleDateString("en-CA"),
+                              description: `${lean} ${postedTotal.toFixed(1)}`,
+                              reasoning: `Model projects ${total.projectedTotal} vs posted ${postedTotal} — gap: ${gap.toFixed(1)} pts`,
+                              recommendedAt: BigInt(Date.now()),
+                              confidence: BigInt(
+                                Math.round(
+                                  Math.min(95, 60 + Math.abs(gap) * 2),
+                                ),
+                              ),
+                              preGameOdds: `${postedTotal.toFixed(1)}`,
+                            },
+                            {
+                              onSuccess: () => {
+                                setLogState("logged");
+                                setTimeout(() => setLogState("idle"), 3000);
+                              },
+                              onError: () => setLogState("idle"),
+                            },
+                          );
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/60 bg-card font-mono text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {logState === "pending"
+                          ? "Logging..."
+                          : logState === "logged"
+                            ? "Logged ✓"
+                            : "Log this bet"}
+                      </button>
+                    </>
                   ) : (
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/40 font-mono text-xs text-muted-foreground">
                       Line gap too small to bet confidently — skip
@@ -1933,6 +1983,19 @@ export default function InvestigationPage() {
     refetch,
   } = useGameDetail(gameId, gameDate ?? "");
   const [activeTab, setActiveTab] = useState<TabId>("props");
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+
+  // Auto-refresh for live games
+  useEffect(() => {
+    if (investigation?.game.status !== "inProgress") return;
+    const interval = setInterval(() => refetch(), 180_000);
+    return () => clearInterval(interval);
+  }, [investigation?.game.status, refetch]);
+
+  // Track last updated timestamp whenever investigation data changes
+  useEffect(() => {
+    if (investigation) setLastUpdated(Date.now());
+  }, [investigation]);
 
   // Fix 4: validate gameId and log for debugging
   useEffect(() => {
@@ -2058,6 +2121,15 @@ export default function InvestigationPage() {
                 <span className="flex items-center gap-1">
                   <Trophy className="w-3 h-3 text-accent" />
                   {game.series}
+                </span>
+              )}
+              {investigation?.game.status === "inProgress" && (
+                <span className="flex items-center gap-1 text-primary/70">
+                  <RefreshCw className="w-3 h-3" />
+                  Updated{" "}
+                  {Math.floor((Date.now() - lastUpdated) / 60_000) === 0
+                    ? "just now"
+                    : `${Math.floor((Date.now() - lastUpdated) / 60_000)} min ago`}
                 </span>
               )}
             </div>
