@@ -1,5 +1,6 @@
 import { BetStatus, BetType } from "@/backend";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
+import { GlossaryTip } from "@/components/GlossaryTip";
 import { InjuryBadge } from "@/components/InjuryBadge";
 import { OddsCard } from "@/components/OddsCard";
 import { Badge } from "@/components/ui/badge";
@@ -1478,7 +1479,7 @@ function ThePlayCard({ investigation }: { investigation: GameInvestigation }) {
             </span>
             <span
               className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-mono font-bold border",
+                "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold border",
                 isHighConv
                   ? "border-primary/50 text-primary bg-primary/10"
                   : isMedConv
@@ -1487,6 +1488,7 @@ function ThePlayCard({ investigation }: { investigation: GameInvestigation }) {
               )}
             >
               {play.confidence}% conf
+              <GlossaryTip term="confidence" />
             </span>
           </div>
         </div>
@@ -1603,13 +1605,15 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
               <span className="flex items-center gap-1 px-2 py-0.5 rounded border border-destructive/50 text-destructive bg-destructive/10 text-[9px] font-mono uppercase tracking-widest">
                 <Flame className="w-2.5 h-2.5" />
                 Steam Alert
+                <GlossaryTip term="steam move" />
               </span>
             )}
           </div>
           <div className="p-4 grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground flex items-center">
                 Spread
+                <GlossaryTip term="spread" />
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-mono text-muted-foreground/60">
@@ -1648,8 +1652,9 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
               )}
             </div>
             <div className="space-y-2">
-              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground flex items-center">
                 Total (O/U)
+                <GlossaryTip term="over/under" />
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-mono text-muted-foreground/60">
@@ -1686,8 +1691,9 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
           </div>
           {lineMovement.sharpSide !== "NONE" && (
             <div className="px-4 pb-4">
-              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+              <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground mb-1 flex items-center">
                 Sharp Action
+                <GlossaryTip term="sharp action" />
               </p>
               <p className="text-xs font-mono text-accent font-semibold">
                 {lineMovement.sharpSide} side getting sharp money

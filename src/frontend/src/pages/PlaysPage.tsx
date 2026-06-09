@@ -1,4 +1,5 @@
 import { BetStatus, BetType } from "@/backend";
+import { GlossaryTip } from "@/components/GlossaryTip";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -41,13 +42,13 @@ function kellySize(confidencePct: number, americanOdds = -110): number {
 function betTypeLabel(play: AnyPlay): string {
   if (play.betType === "total") {
     return play.sport === "MLB"
-      ? `Game total (combined runs scored by both teams)`
-      : `Game total (combined points scored by both teams)`;
+      ? "Game total (combined runs scored by both teams)"
+      : "Game total (combined points scored by both teams)";
   }
   if (play.betType === "spread") {
-    return `Point spread (team must win by/within the listed margin)`;
+    return "Point spread (team must win by/within the listed margin)";
   }
-  return `Moneyline (just pick the winner, no margin required)`;
+  return "Moneyline (just pick the winner, no margin required)";
 }
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ function ConfidenceBadge({ value }: { value: number }) {
     >
       <Zap className="w-2.5 h-2.5" />
       {value}% confidence
+      <GlossaryTip term="confidence" />
     </span>
   );
 }
@@ -189,6 +191,15 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           {/* Plain-language bet type explanation */}
           <p className="text-[10px] font-mono text-muted-foreground/50 mt-0.5 italic">
             {betTypeLabel(play)}
+            <GlossaryTip
+              term={
+                play.betType === "total"
+                  ? "over/under"
+                  : play.betType === "spread"
+                    ? "spread"
+                    : "moneyline"
+              }
+            />
           </p>
           <p className="text-xs font-mono text-muted-foreground/70 mt-1">
             {play.summaryText}
@@ -209,8 +220,9 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50 flex items-center">
               Quarter-Kelly formula
+              <GlossaryTip term="quarter-kelly" />
             </p>
             <p className="text-[10px] font-mono text-muted-foreground/60">
               Bankroll: ${bankroll} · Set in Settings
@@ -235,6 +247,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
                 <div className="min-w-0">
                   <span className="text-[10px] font-mono text-primary mr-1.5">
                     {sig.name}:
+                    <GlossaryTip term={sig.name.toLowerCase()} />
                   </span>
                   <span className="text-[10px] font-mono text-muted-foreground">
                     {sig.description}
