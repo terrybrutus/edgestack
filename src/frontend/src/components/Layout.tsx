@@ -11,6 +11,7 @@ import {
   BookOpen,
   Crosshair,
   Settings,
+  Trophy,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -146,6 +147,18 @@ export function Layout({ children, className }: LayoutProps) {
               <Link to="/history">
                 <BookOpen className="w-3.5 h-3.5" />
                 History
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 font-mono text-[10px] uppercase tracking-widest"
+              asChild
+              data-ocid="nav.challenges_button"
+            >
+              <Link to="/challenges">
+                <Trophy className="w-3.5 h-3.5" />
+                Challenges
               </Link>
             </Button>
             <Button
