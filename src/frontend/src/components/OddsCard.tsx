@@ -53,10 +53,10 @@ export function OddsCard({
           {awayTeam} ML
         </span>
         <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground text-center">
-          Spread
+          {awayTeam} Spread
         </span>
         <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground text-center">
-          O/U
+          Game O/U
         </span>
       </div>
 

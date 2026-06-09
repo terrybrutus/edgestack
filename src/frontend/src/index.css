@@ -27,29 +27,29 @@
     --font-mono: Geist Mono;
     --radius: 0.25rem;
 
-    --background: 0.13 0 0;
-    --foreground: 0.92 0 0;
-    --card: 0.16 0 0;
-    --card-foreground: 0.92 0 0;
-    --popover: 0.18 0 0;
-    --popover-foreground: 0.92 0 0;
+    --background: 0.98 0 0;
+    --foreground: 0.18 0 0;
+    --card: 1 0 0;
+    --card-foreground: 0.18 0 0;
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0 0;
 
     --primary: 0.65 0.18 145;
-    --primary-foreground: 0.13 0 0;
+    --primary-foreground: 0.98 0 0;
 
-    --secondary: 0.2 0 0;
-    --secondary-foreground: 0.8 0 0;
-    --muted: 0.22 0 0;
+    --secondary: 0.94 0 0;
+    --secondary-foreground: 0.25 0 0;
+    --muted: 0.95 0 0;
     --muted-foreground: 0.5 0 0;
 
     --accent: 0.7 0.15 85;
-    --accent-foreground: 0.13 0 0;
+    --accent-foreground: 0.18 0 0;
 
     --destructive: 0.55 0.22 25;
-    --destructive-foreground: 0.92 0 0;
+    --destructive-foreground: 0.98 0 0;
 
-    --border: 0.25 0 0;
-    --input: 0.25 0 0;
+    --border: 0.9 0 0;
+    --input: 0.9 0 0;
     --ring: 0.65 0.18 145;
 
     --chart-1: 0.65 0.18 145;
@@ -58,13 +58,13 @@
     --chart-4: 0.5 0.18 260;
     --chart-5: 0.6 0.16 150;
 
-    --sidebar: 0.15 0 0;
-    --sidebar-foreground: 0.92 0 0;
+    --sidebar: 0.96 0 0;
+    --sidebar-foreground: 0.18 0 0;
     --sidebar-primary: 0.65 0.18 145;
-    --sidebar-primary-foreground: 0.13 0 0;
-    --sidebar-accent: 0.22 0 0;
-    --sidebar-accent-foreground: 0.8 0 0;
-    --sidebar-border: 0.25 0 0;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.94 0 0;
+    --sidebar-accent-foreground: 0.25 0 0;
+    --sidebar-border: 0.9 0 0;
     --sidebar-ring: 0.65 0.18 145;
   }
 

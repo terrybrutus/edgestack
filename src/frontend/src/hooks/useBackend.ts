@@ -117,12 +117,18 @@ export function usePlayerProps(gameId: string, enabled = true) {
     queryKey: ["player-props", gameId],
     queryFn: async () => {
       if (!gameId) return null;
+      // Always resolves within a bounded time (see fetchActivePlayersForGame),
+      // returning an empty analysis rather than hanging.
       return fetchActivePlayersForGame(gameId);
     },
     enabled: !!gameId && enabled,
-    retry: 2,
-    staleTime: Number.POSITIVE_INFINITY,
+    // The fetch already bounds its own time and never rejects, so a single
+    // retry is plenty — avoids any refetch-loop and keeps total time bounded.
+    retry: 1,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8_000),
+    staleTime: 5 * 60_000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
