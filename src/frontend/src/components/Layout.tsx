@@ -11,8 +11,8 @@ import {
   BookOpen,
   Crosshair,
   Settings,
-  Trophy,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
