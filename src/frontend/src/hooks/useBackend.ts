@@ -63,8 +63,8 @@ export function useTodayGames() {
           isUpcomingDate: false,
         };
       }
-      // No games today — find next slate
-      for (let i = 1; i <= 7; i++) {
+      // No games today — check next 2 days only (cap BDL calls)
+      for (let i = 1; i <= 2; i++) {
         const next = new Date(
           new Date().getTime() + i * 86400000,
         ).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
@@ -468,9 +468,7 @@ export function usePlays() {
 
       // ── NBA plays ───────────────────────────────────────────────────────────
       const { analyzeNbaEdge } = await import("@/services/analysis");
-      const { fetchGamesForDate, fetchTeamLastNGames } = await import(
-        "@/services/games-facade"
-      );
+      const { fetchGamesForDate } = await import("@/services/games-facade");
       const { fetchOdds, parseOddsEvent } = await import("@/services/odds");
 
       const [bdlGames, nbaOdds] = await Promise.allSettled([
@@ -484,18 +482,12 @@ export function usePlays() {
 
       await Promise.all(
         games.map(async (g) => {
-          const season = g.season;
-          const [homeGames, awayGames] = await Promise.allSettled([
-            fetchTeamLastNGames(g.home_team.id, season, 5),
-            fetchTeamLastNGames(g.visitor_team.id, season, 5),
-          ]);
-          const homeRecent =
-            homeGames.status === "fulfilled" ? homeGames.value : [];
-          const awayRecent =
-            awayGames.status === "fulfilled" ? awayGames.value : [];
-
-          const homeRestDays = computeRestDays(homeRecent, today);
-          const awayRestDays = computeRestDays(awayRecent, today);
+          // Skip fetchTeamLastNGames here — each call queues through the BDL
+          // rate-limiter and serializes at 1 req/sec. With 5+ games that's 10+
+          // extra seconds blocking the plays page. Rest days default to 3 (a
+          // neutral assumption); the detailed game view has the full data.
+          const homeRestDays = 3;
+          const awayRestDays = 3;
 
           const oddsEvent = oddsEvents.find(
             (e) =>
