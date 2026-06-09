@@ -1,0 +1,39 @@
+name: Auto-merge Claude branch
+
+# When Claude Code pushes to any claude/* branch, open a PR into main
+# (if one isn't already open) and enable auto-merge. With --auto, GitHub
+# merges immediately if there are no required checks, or waits for checks
+# to pass if any are added later — so this never silently breaks.
+
+on:
+  push:
+    branches:
+      - "claude/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open PR if missing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "${{ github.ref_name }}" \
+            --title "Claude: ${{ github.ref_name }}" \
+            --body "Auto-generated from a Claude Code session." \
+            --repo "${{ github.repository }}" \
+          || echo "PR already exists — continuing."
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_URL=$(gh pr view "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" --json url -q .url)
+          gh pr merge "$PR_URL" --auto --merge

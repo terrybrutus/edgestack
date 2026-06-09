@@ -98,22 +98,6 @@ export interface BdlPlayer {
   team: BdlTeam;
 }
 
-export interface BdlStat {
-  id: number;
-  game: { id: number };
-  player: BdlPlayer;
-  team: BdlTeam;
-  pts: number;
-  reb: number;
-  ast: number;
-  stl: number;
-  blk: number;
-  min: string;
-  fg_pct: number | null;
-  fg3_pct: number | null;
-  ft_pct: number | null;
-}
-
 export interface BdlSeasonAvg {
   player_id: number;
   season: number;
@@ -142,14 +126,6 @@ export async function fetchTeamLastNGames(
   const url = `${CONFIG.BDL_BASE}/games?team_ids[]=${teamId}&seasons[]=${season}&per_page=${n}`;
   const json = (await bdlFetch(url)) as { data?: BdlGame[] };
   return (json.data ?? []) as BdlGame[];
-}
-
-export async function fetchPlayerStatsForGame(
-  gameId: number,
-): Promise<BdlStat[]> {
-  const url = `${CONFIG.BDL_BASE}/stats?game_ids[]=${gameId}&per_page=100`;
-  const json = (await bdlFetch(url)) as { data?: BdlStat[] };
-  return json.data ?? [];
 }
 
 export async function fetchSeasonAverages(

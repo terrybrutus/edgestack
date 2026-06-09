@@ -141,6 +141,12 @@ function NtfySection() {
           <li>3. In the ntfy app, subscribe to that same topic name</li>
           <li>4. Hit "Send Test" — your phone should buzz within seconds</li>
         </ol>
+        <p className="text-[10px] font-mono text-accent/90 leading-relaxed pt-1.5 border-t border-border/30 mt-1.5">
+          Heads up: new-play alerts are sent by your browser, so they only fire
+          while EdgeStack is open in a tab. If the test buzzes but you never get
+          play alerts, that's why — keep the app open, or ask for server-side
+          push (sent from the canister even when the app is closed).
+        </p>
       </div>
 
       {/* Input + test */}

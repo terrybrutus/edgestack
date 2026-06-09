@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { type AnyPlay, usePlays } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import {
   CHALLENGE_PRESETS,
@@ -19,11 +20,19 @@ import {
   ChevronDown,
   ChevronUp,
   PlusCircle,
+  Target,
   Trash2,
   Trophy,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+
+// A play prefilled into the bet form
+interface Prefill {
+  description: string;
+  amount: number;
+  confidence: number;
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,15 +72,18 @@ interface AddBetFormProps {
   challenge: Challenge;
   onSave: (c: Challenge) => void;
   onCancel: () => void;
+  prefill?: Prefill;
 }
 
-function AddBetForm({ challenge, onSave, onCancel }: AddBetFormProps) {
+function AddBetForm({ challenge, onSave, onCancel, prefill }: AddBetFormProps) {
   const bankroll = Number(localStorage.getItem("bankroll") ?? "100");
-  const suggested = recommendBetSize(challenge, 60);
+  const suggested = prefill?.amount ?? recommendBetSize(challenge, 60);
 
-  const [desc, setDesc] = useState("");
+  const [desc, setDesc] = useState(prefill?.description ?? "");
   const [amount, setAmount] = useState(String(suggested));
-  const [confidence, setConfidence] = useState("60");
+  const [confidence, setConfidence] = useState(
+    String(prefill?.confidence ?? 60),
+  );
   const [odds, setOdds] = useState("-110");
   const [result, setResult] = useState<"won" | "lost" | "push">("won");
 
@@ -219,11 +231,19 @@ interface ChallengeCardProps {
   challenge: Challenge;
   onUpdate: (c: Challenge) => void;
   onDelete: (id: string) => void;
+  plays: AnyPlay[];
 }
 
-function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
+function ChallengeCard({
+  challenge,
+  onUpdate,
+  onDelete,
+  plays,
+}: ChallengeCardProps) {
   const [showForm, setShowForm] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPlays, setShowPlays] = useState(false);
+  const [prefill, setPrefill] = useState<Prefill | undefined>(undefined);
   const preset = CHALLENGE_PRESETS[challenge.type];
   const stats = challengeStats(challenge);
   const suggested = recommendBetSize(challenge, 60);
@@ -355,12 +375,28 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
             className="flex-1"
             onClick={() => {
               setShowForm(!showForm);
+              setPrefill(undefined);
               setShowHistory(false);
+              setShowPlays(false);
             }}
           >
             <PlusCircle className="w-3.5 h-3.5 mr-1" />
             Log Result
           </Button>
+          {plays.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setShowPlays(!showPlays);
+                setShowForm(false);
+                setShowHistory(false);
+              }}
+            >
+              <Target className="w-3.5 h-3.5 mr-1" />
+              Plays
+            </Button>
+          )}
           {challenge.bets.length > 0 && (
             <Button
               size="sm"
@@ -368,6 +404,7 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
               onClick={() => {
                 setShowHistory(!showHistory);
                 setShowForm(false);
+                setShowPlays(false);
               }}
             >
               {showHistory ? (
@@ -378,6 +415,54 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
               History
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Suggested plays for this challenge — sized to this challenge's rules */}
+      {showPlays && challenge.status === "active" && (
+        <div className="space-y-2 mt-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Plays for this challenge
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Today's top edges, each sized by this challenge's strategy. Tap one
+            to log it.
+          </p>
+          {plays.slice(0, 5).map((p, i) => {
+            const conf = Number(p.confidence);
+            const size = recommendBetSize(challenge, conf);
+            return (
+              <button
+                key={`${p.betText}-${i}`}
+                type="button"
+                onClick={() => {
+                  setPrefill({
+                    description: p.betText,
+                    amount: size,
+                    confidence: conf,
+                  });
+                  setShowForm(true);
+                  setShowPlays(false);
+                }}
+                className="w-full flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/40 bg-muted/20 hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {p.betText}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {conf}% confidence
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Bet
+                  </p>
+                  <p className="text-sm font-bold text-primary">${fmt(size)}</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -400,11 +485,16 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
       {showForm && (
         <AddBetForm
           challenge={challenge}
+          prefill={prefill}
           onSave={(updated) => {
             onUpdate(updated);
             setShowForm(false);
+            setPrefill(undefined);
           }}
-          onCancel={() => setShowForm(false)}
+          onCancel={() => {
+            setShowForm(false);
+            setPrefill(undefined);
+          }}
         />
       )}
 
@@ -602,6 +692,13 @@ export default function ChallengesPage() {
     getChallenges(),
   );
   const [showNew, setShowNew] = useState(false);
+  const { data: playsData } = usePlays();
+
+  // Today's plays from the same feed the Plays page uses, ranked by confidence.
+  const topPlays: AnyPlay[] = [
+    ...(playsData?.nbaPlays ?? []),
+    ...(playsData?.mlbPlays ?? []),
+  ].sort((a, b) => Number(b.confidence) - Number(a.confidence));
 
   function refresh() {
     setChallenges(getChallenges());
@@ -670,6 +767,7 @@ export default function ChallengesPage() {
                 challenge={c}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                plays={topPlays}
               />
             ))}
           </div>
@@ -688,6 +786,7 @@ export default function ChallengesPage() {
                 challenge={c}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                plays={[]}
               />
             ))}
           </div>

@@ -474,6 +474,19 @@ function PlayerPropsTab({
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const propsAI = usePropsAIAnalysis();
 
+  // After ~10s of waiting, surface a "taking longer than usual" hint. The
+  // underlying fetch is bounded (~30s) and always resolves, so this is just
+  // reassurance — never a permanent state.
+  const [slowLoad, setSlowLoad] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setSlowLoad(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowLoad(true), 10_000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
   // Mark as fetched once tab is first activated
   if (isActiveTab && !hasFetched) setHasFetched(true);
 
@@ -495,6 +508,17 @@ function PlayerPropsTab({
   if (isLoading) {
     return (
       <div className="space-y-4" data-ocid="investigation.props.loading_state">
+        {slowLoad && (
+          <div
+            className="rounded-xl border border-border/40 bg-card/50 px-5 py-4 text-center"
+            data-ocid="investigation.props.slow_load_state"
+          >
+            <p className="text-xs font-mono text-muted-foreground">
+              This is taking longer than usual — fetching live rosters and prop
+              lines. Hang tight…
+            </p>
+          </div>
+        )}
         {[0, 1, 2].map((i) => (
           <div
             key={i}
@@ -539,34 +563,10 @@ function PlayerPropsTab({
     );
   }
 
-  // Data still loading or not yet available — show skeleton
-  if (!propsData) {
-    return (
-      <div className="space-y-4" data-ocid="investigation.props.loading_state">
-        <div className="rounded-xl border border-border/40 bg-card/50 px-5 py-4 text-center">
-          <p className="text-xs font-mono text-muted-foreground">
-            Player props loading — this may take a moment
-          </p>
-        </div>
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-border/40 bg-card p-5 space-y-3"
-          >
-            <Skeleton className="h-6 w-48" />
-            <div className="grid grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((j) => (
-                <Skeleton key={j} className="h-12" />
-              ))}
-            </div>
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  const sorted = [...propsData.players].sort((a, b) => {
+  // The query always resolves to a non-null analysis within a bounded time
+  // (empty players → terminal empty state below). If somehow undefined while
+  // not loading/erroring, fall through to the empty state rather than spin.
+  const sorted = [...(propsData?.players ?? [])].sort((a, b) => {
     const sa = a.confidenceReport ? Number(a.confidenceReport.score) : 0;
     const sb = b.confidenceReport ? Number(b.confidenceReport.score) : 0;
     return sb - sa;
@@ -607,7 +607,7 @@ function PlayerPropsTab({
           {sorted.length} players analyzed · sorted by confidence
         </span>
         <span className="text-[10px] font-mono text-muted-foreground">
-          Generated {propsData.analysisGeneratedAt}
+          Generated {propsData?.analysisGeneratedAt ?? ""}
         </span>
       </div>
 

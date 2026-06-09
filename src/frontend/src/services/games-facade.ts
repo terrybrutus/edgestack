@@ -28,7 +28,6 @@ import {
   bdlStatusToEtDate,
   fetchActivePlayers,
   fetchGamesForDate,
-  fetchPlayerStatsForGame,
   fetchSeasonAverages,
   fetchTeamLastNGames,
   parseBdlStatus,
@@ -276,25 +275,84 @@ export async function buildInvestigationFromBdl(
 
 // ── Player props (BDL active players + season avgs) ───────────────────────────
 
+// Wraps a promise so it always settles within `ms`, resolving to `fallback`
+// on timeout instead of hanging. Prevents the player-props fetch from spinning
+// forever when the rate-limited BDL queue backs up.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
+const PROPS_FETCH_TIMEOUT_MS = 30_000; // overall bound — never hang past this
+const MAX_ENRICHED_PLAYERS = 12; // cap serial BDL season-average enrichment
+
+// Always resolves (never rejects) within PROPS_FETCH_TIMEOUT_MS. Returns an
+// empty (but non-null) analysis when no data is available so the UI reaches a
+// terminal "no prop lines" state instead of an endless skeleton.
 export async function fetchActivePlayersForGame(
   gameId: string,
-): Promise<PlayerPropsAnalysis | null> {
-  // Get current game to find team IDs
-  const today = new Date().toLocaleDateString("en-CA", {
-    timeZone: "America/New_York",
-  });
-  const games = await fetchGamesForDate(today).catch(() => []);
-  const bdlGame = games.find((g) => String(g.id) === gameId);
-  if (!bdlGame) return null;
+): Promise<PlayerPropsAnalysis> {
+  const empty: PlayerPropsAnalysis = {
+    gameId,
+    players: [],
+    analysisGeneratedAt: new Date().toISOString(),
+  };
+  return withTimeout(
+    fetchActivePlayersForGameInner(gameId).catch(() => empty),
+    PROPS_FETCH_TIMEOUT_MS,
+    empty,
+  );
+}
+
+async function fetchActivePlayersForGameInner(
+  gameId: string,
+): Promise<PlayerPropsAnalysis> {
+  const emptyResult: PlayerPropsAnalysis = {
+    gameId,
+    players: [],
+    analysisGeneratedAt: new Date().toISOString(),
+  };
+
+  // Locate the game — check today first, then the next 2 days (the game list
+  // hook surfaces upcoming dates, so a "today" lookup can legitimately miss).
+  const candidateDates = [0, 1, 2].map((offset) =>
+    new Date(Date.now() + offset * 86400000).toLocaleDateString("en-CA", {
+      timeZone: "America/New_York",
+    }),
+  );
+  let bdlGame: BdlGame | undefined;
+  for (const date of candidateDates) {
+    const games = await fetchGamesForDate(date).catch(() => []);
+    bdlGame = games.find((g) => String(g.id) === gameId);
+    if (bdlGame) break;
+  }
+  if (!bdlGame) return emptyResult;
 
   const [homePlayers, awayPlayers] = await Promise.all([
-    fetchActivePlayers(bdlGame.home_team.id),
-    fetchActivePlayers(bdlGame.visitor_team.id),
+    fetchActivePlayers(bdlGame.home_team.id).catch(() => []),
+    fetchActivePlayers(bdlGame.visitor_team.id).catch(() => []),
   ]);
 
-  const allPlayers = [...homePlayers, ...awayPlayers].slice(0, 12);
+  const allPlayers = [...homePlayers, ...awayPlayers].slice(
+    0,
+    MAX_ENRICHED_PLAYERS,
+  );
   const playerIds = allPlayers.map((p) => p.id);
-  const avgs = await fetchSeasonAverages(playerIds, bdlGame.season);
+  const avgs =
+    playerIds.length > 0
+      ? await fetchSeasonAverages(playerIds, bdlGame.season).catch(() => [])
+      : [];
   const avgMap = new Map(avgs.map((a) => [a.player_id, a]));
 
   const { fetchPlayerPropsFromOdds } = await import("./odds");

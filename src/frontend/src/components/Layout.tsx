@@ -4,13 +4,16 @@ import {
   useIsOpenAIConfigured,
   usePlays,
 } from "@/hooks/useBackend";
+import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
   Activity,
   BookOpen,
   Crosshair,
+  Moon,
   Settings,
+  Sun,
   TrendingUp,
   Trophy,
 } from "lucide-react";
@@ -25,6 +28,7 @@ export function Layout({ children, className }: LayoutProps) {
   const { data: isOpenAiConfigured } = useIsOpenAIConfigured();
   const { data: isOddsConfigured } = useIsOddsApiConfigured();
   const { data: plays } = usePlays();
+  const { theme, toggleTheme } = useTheme();
   const matchRoute = useMatchRoute();
   const isOnPlays = !!matchRoute({ to: "/plays" });
 
@@ -160,6 +164,20 @@ export function Layout({ children, className }: LayoutProps) {
                 <Trophy className="w-3.5 h-3.5" />
                 Challenges
               </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              data-ocid="nav.theme_toggle"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
             </Button>
             <Button
               variant="ghost"
