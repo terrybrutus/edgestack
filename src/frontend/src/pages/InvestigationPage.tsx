@@ -700,499 +700,6 @@ function PaceCard({ pace, teamName }: { pace: PaceProfile; teamName: string }) {
   );
 }
 
-// ─── Game Total Tab ───────────────────────────────────────────────────────────
-function GameTotalTab({
-  gameId,
-  homeTeamName,
-  awayTeamName,
-  isActiveTab,
-  postedTotal,
-}: {
-  gameId: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  isActiveTab: boolean;
-  postedTotal?: number;
-}) {
-  const [hasFetched, setHasFetched] = useState(false);
-  const [logState, setLogState] = useState<"idle" | "pending" | "logged">(
-    "idle",
-  );
-  const saveBet = useSaveBetRecommendation();
-  const shouldFetch = isActiveTab || hasFetched;
-  const { data, isLoading, isError, refetch } = useGameTotal(
-    gameId,
-    homeTeamName,
-    awayTeamName,
-    shouldFetch,
-  );
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const totalsAI = useTotalsAIAnalysis();
-
-  // Mark as fetched once tab is first activated
-  if (isActiveTab && !hasFetched) setHasFetched(true);
-
-  const handleAIAnalyze = () => {
-    if (!data) return;
-    const summary = `Home: ${homeTeamName} pace ${data.homePace.pace.toFixed(1)}, off ${data.homePace.offensiveEfficiency.toFixed(1)}, def ${data.homePace.defensiveEfficiency.toFixed(1)}. Away: ${awayTeamName} pace ${data.awayPace.pace.toFixed(1)}, off ${data.awayPace.offensiveEfficiency.toFixed(1)}, def ${data.awayPace.defensiveEfficiency.toFixed(1)}. Projected total: ${(data.projectedTotal ?? data.impliedTotal ?? 0).toFixed(1)}.`;
-    totalsAI.mutate(
-      { gameId, totalsData: summary },
-      { onSuccess: (result) => setAiAnalysis(result) },
-    );
-  };
-  const total = data as GameTotal | undefined;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4" data-ocid="investigation.total.loading_state">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
-        </div>
-        <Skeleton className="h-32" />
-        <Skeleton className="h-24" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div
-        className="flex flex-col items-center gap-4 py-16"
-        data-ocid="investigation.total.error_state"
-      >
-        <AlertTriangle className="w-8 h-8 text-destructive" />
-        <p className="font-mono text-sm text-muted-foreground">
-          Failed to load game totals
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          className="font-mono text-xs"
-          data-ocid="investigation.total.retry_button"
-        >
-          <RefreshCw className="w-3 h-3 mr-2" />
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  // Still waiting for data — show loading skeleton
-  if (!total) {
-    return (
-      <div className="space-y-4" data-ocid="investigation.total.loading_state">
-        <div className="rounded-xl border border-border/40 bg-card/50 px-5 py-4 text-center">
-          <p className="text-xs font-mono text-muted-foreground">
-            Loading game totals analysis…
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
-        </div>
-        <Skeleton className="h-32" />
-      </div>
-    );
-  }
-
-  const report = total.confidenceReport;
-  const score = report ? Number(report.score) : 0;
-  const isOver = report?.overUnderEdge?.toUpperCase() === "OVER";
-  const isUnder = report?.overUnderEdge?.toUpperCase() === "UNDER";
-
-  // Split trends: last 5 for each team by alternating or team-based
-  const homeTrends = total.recentTrends.slice(0, 5);
-  const awayTrends = total.recentTrends.slice(5, 10);
-
-  return (
-    <div className="space-y-5">
-      {/* Projected total hero + plain-language bet vs posted line */}
-      {(total.projectedTotal ?? total.impliedTotal) && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-xl border border-primary/30 bg-primary/5 p-6 text-center space-y-2"
-        >
-          <div className="text-[10px] font-mono uppercase tracking-widest text-primary">
-            Model Projection
-          </div>
-          <div className="font-display font-bold text-5xl text-primary">
-            {(total.projectedTotal ?? total.impliedTotal)?.toFixed(1)}
-          </div>
-          {postedTotal != null && total.projectedTotal != null ? (
-            (() => {
-              const gap = total.projectedTotal - postedTotal;
-              const absGap = Math.abs(gap);
-              const lean = gap > 0 ? "OVER" : "UNDER";
-              const isSignificant = absGap >= 2;
-              return (
-                <div className="space-y-2 mt-1">
-                  <div className="flex items-center justify-center gap-3 text-sm font-mono text-muted-foreground">
-                    <span>
-                      FanDuel O/U:{" "}
-                      <span className="text-foreground font-bold">
-                        {postedTotal.toFixed(1)}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span>
-                      Gap:{" "}
-                      <span
-                        className={cn(
-                          "font-bold",
-                          gap > 0 ? "text-primary" : "text-accent",
-                        )}
-                      >
-                        {gap > 0 ? "+" : ""}
-                        {gap.toFixed(1)}
-                      </span>
-                    </span>
-                  </div>
-                  {isSignificant ? (
-                    <>
-                      <div
-                        className={cn(
-                          "inline-flex items-center gap-2 px-4 py-2 rounded-lg border font-mono font-bold text-sm",
-                          lean === "OVER"
-                            ? "border-primary/60 bg-primary/15 text-primary"
-                            : "border-accent/60 bg-accent/15 text-accent",
-                        )}
-                      >
-                        {lean === "OVER" ? (
-                          <TrendingUp className="w-4 h-4" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4" />
-                        )}
-                        Take {lean} {postedTotal.toFixed(1)} on FanDuel
-                        <span className="ml-1 text-[10px] opacity-70">
-                          ({absGap.toFixed(1)} pt gap)
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={logState !== "idle"}
-                        onClick={() => {
-                          setLogState("pending");
-                          saveBet.mutate(
-                            {
-                              id: crypto.randomUUID(),
-                              gameId,
-                              status: BetStatus.pending,
-                              betType: BetType.gameTotal,
-                              homeTeam: homeTeamName,
-                              awayTeam: awayTeamName,
-                              gameDate: new Date().toLocaleDateString("en-CA"),
-                              description: `${lean} ${postedTotal.toFixed(1)}`,
-                              reasoning: `Model projects ${total.projectedTotal} vs posted ${postedTotal} — gap: ${gap.toFixed(1)} pts`,
-                              recommendedAt: BigInt(Date.now()),
-                              confidence: BigInt(
-                                Math.round(
-                                  Math.min(95, 60 + Math.abs(gap) * 2),
-                                ),
-                              ),
-                              preGameOdds: `${postedTotal.toFixed(1)}`,
-                            },
-                            {
-                              onSuccess: () => {
-                                setLogState("logged");
-                                setTimeout(() => setLogState("idle"), 3000);
-                              },
-                              onError: () => setLogState("idle"),
-                            },
-                          );
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/60 bg-card font-mono text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {logState === "pending"
-                          ? "Logging..."
-                          : logState === "logged"
-                            ? "Logged ✓"
-                            : "Log this bet"}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/40 font-mono text-xs text-muted-foreground">
-                      Line gap too small to bet confidently — skip
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          ) : report?.overUnderEdge ? (
-            <div
-              className={cn(
-                "inline-flex items-center gap-2 px-4 py-1.5 rounded-full border font-mono font-bold text-sm",
-                isOver
-                  ? "border-primary/50 bg-primary/10 text-primary"
-                  : isUnder
-                    ? "border-accent/50 bg-accent/10 text-accent"
-                    : "border-border text-muted-foreground",
-              )}
-            >
-              {isOver ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : (
-                <TrendingDown className="w-4 h-4" />
-              )}
-              {report.overUnderEdge}
-            </div>
-          ) : null}
-        </motion.div>
-      )}
-
-      {/* Pace cards side by side */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <PaceCard pace={total.awayPace} teamName={awayTeamName} />
-        <PaceCard pace={total.homePace} teamName={homeTeamName} />
-      </div>
-
-      {/* Scoring comparison bars — only real data */}
-      {(total.homePace.offensiveEfficiency > 0 ||
-        total.awayPace.offensiveEfficiency > 0) && (
-        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-3">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-4 h-4 text-primary" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Scoring Comparison
-            </span>
-          </div>
-          <EfficiencyBar
-            label="PPG"
-            homeVal={total.homePace.offensiveEfficiency}
-            awayVal={total.awayPace.offensiveEfficiency}
-            homeTeam={homeTeamName}
-            awayTeam={awayTeamName}
-          />
-          {total.homePace.avgPointsAgainst > 0 &&
-            total.awayPace.avgPointsAgainst > 0 && (
-              <EfficiencyBar
-                label="Opp PPG"
-                homeVal={total.homePace.avgPointsAgainst}
-                awayVal={total.awayPace.avgPointsAgainst}
-                homeTeam={homeTeamName}
-                awayTeam={awayTeamName}
-              />
-            )}
-        </div>
-      )}
-
-      {/* Scoring trends */}
-      {(homeTrends.length > 0 || awayTrends.length > 0) && (
-        <div className="rounded-xl border border-border/60 bg-card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Last 5 Games Scoring Trend
-            </span>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-6">
-            {homeTrends.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-xs font-mono text-foreground">
-                  {homeTeamName}
-                </span>
-                <TrendBars trends={homeTrends} />
-                <div className="flex gap-2 text-[10px] font-mono text-muted-foreground">
-                  {homeTrends.map((t, i) => (
-                    <span
-                      key={i}
-                      className={
-                        t.result === "W"
-                          ? "text-primary"
-                          : "text-muted-foreground"
-                      }
-                    >
-                      {t.teamTotal}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {awayTrends.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-xs font-mono text-foreground">
-                  {awayTeamName}
-                </span>
-                <TrendBars trends={awayTrends} />
-                <div className="flex gap-2 text-[10px] font-mono text-muted-foreground">
-                  {awayTrends.map((t, i) => (
-                    <span
-                      key={i}
-                      className={
-                        t.result === "W"
-                          ? "text-primary"
-                          : "text-muted-foreground"
-                      }
-                    >
-                      {t.teamTotal}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Injury impact */}
-      {total.injuryImpact && (
-        <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-accent" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-accent">
-              Injury Impact
-            </span>
-          </div>
-          <p className="text-sm font-body text-muted-foreground leading-relaxed">
-            {total.injuryImpact}
-          </p>
-        </div>
-      )}
-
-      {/* Referee profile */}
-      {total.refereeProfile && (
-        <div className="rounded-lg border border-border/40 bg-card/60 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Referee · {total.refereeProfile.name}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-4 text-xs font-mono">
-            {total.refereeProfile.avgFoulsPerGame !== undefined && (
-              <span className="text-muted-foreground">
-                Fouls/game:{" "}
-                <span className="text-foreground font-bold">
-                  {total.refereeProfile.avgFoulsPerGame.toFixed(1)}
-                </span>
-              </span>
-            )}
-            {total.refereeProfile.avgFreeThrowsPerGame !== undefined && (
-              <span className="text-muted-foreground">
-                FT/game:{" "}
-                <span className="text-foreground font-bold">
-                  {total.refereeProfile.avgFreeThrowsPerGame.toFixed(1)}
-                </span>
-              </span>
-            )}
-            {total.refereeProfile.overRate !== undefined && (
-              <span className="text-muted-foreground">
-                Over rate:{" "}
-                <span
-                  className={cn(
-                    "font-bold",
-                    total.refereeProfile.overRate > 0.55
-                      ? "text-primary"
-                      : total.refereeProfile.overRate < 0.45
-                        ? "text-accent"
-                        : "text-foreground",
-                  )}
-                >
-                  {(total.refereeProfile.overRate * 100).toFixed(0)}%
-                </span>
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Confidence meter */}
-      {report && (
-        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
-          <ConfidenceMeter score={score} grade={report.grade} size="lg" />
-          {report.keyFactors.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {report.keyFactors.map((f, i) => (
-                <span
-                  key={i}
-                  className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-border/60 bg-muted/60 text-muted-foreground"
-                >
-                  {f}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Zap className="w-3 h-3 text-primary" />
-            <span className="text-xs font-mono font-bold text-primary">
-              {report.recommendation}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* AI Analysis */}
-      {report?.reasoning && (
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain className="w-4 h-4 text-primary" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
-              AI Analysis
-            </span>
-          </div>
-          <blockquote className="border-l-2 border-primary/40 pl-4">
-            <p className="text-sm font-body text-muted-foreground leading-relaxed">
-              {report.reasoning}
-            </p>
-          </blockquote>
-          {report.projectedTotal !== undefined && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                Projected total:
-              </span>
-              <span className="font-display font-bold text-primary">
-                {report.projectedTotal.toFixed(1)}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* On-demand deeper AI analysis */}
-      <div className="rounded-xl border border-border/40 bg-card/60 p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
-              Deeper AI Analysis
-            </span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleAIAnalyze}
-            disabled={totalsAI.isPending || !data}
-            className="font-mono text-xs"
-            data-ocid="investigation.total.ai_analyze_button"
-          >
-            <Brain className="w-3 h-3 mr-1.5" />
-            {totalsAI.isPending
-              ? "Analyzing…"
-              : aiAnalysis
-                ? "Re-analyze"
-                : "Analyze with AI"}
-          </Button>
-        </div>
-        {aiAnalysis && (
-          <div className="border-l-2 border-primary/40 pl-4">
-            <MarkdownBlock text={aiAnalysis} />
-          </div>
-        )}
-        {totalsAI.isError && (
-          <p
-            className="text-xs font-mono text-destructive"
-            data-ocid="investigation.total.ai_error_state"
-          >
-            AI analysis failed — contact support if this persists
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── All Odds Tab ─────────────────────────────────────────────────────────────
 function AllOddsTab({
   investigation,
@@ -1302,7 +809,6 @@ function AllOddsTab({
   );
 }
 
-// ─── Edge Tab ─────────────────────────────────────────────────────────────────
 // ─── THE PLAY card ────────────────────────────────────────────────────────────
 interface ThePlayResult {
   direction: string;
@@ -1585,15 +1091,372 @@ function ThePlayCard({ investigation }: { investigation: GameInvestigation }) {
   );
 }
 
-function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
+// ─── Game Analysis Panel (merged GameTotalTab + EdgeTab) ──────────────────────
+function GameAnalysisPanel({
+  gameId,
+  homeTeamName,
+  awayTeamName,
+  isActiveTab,
+  postedTotal,
+  investigation,
+}: {
+  gameId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  isActiveTab: boolean;
+  postedTotal?: number;
+  investigation: GameInvestigation;
+}) {
+  const [hasFetched, setHasFetched] = useState(false);
+  const [logState, setLogState] = useState<"idle" | "pending" | "logged">(
+    "idle",
+  );
+  const saveBet = useSaveBetRecommendation();
+  const shouldFetch = isActiveTab || hasFetched;
+  const { data, isLoading, isError, refetch } = useGameTotal(
+    gameId,
+    homeTeamName,
+    awayTeamName,
+    shouldFetch,
+  );
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const totalsAI = useTotalsAIAnalysis();
+
+  // Mark as fetched once tab is first activated
+  if (isActiveTab && !hasFetched) setHasFetched(true);
+
+  const handleAIAnalyze = () => {
+    if (!data) return;
+    const summary = `Home: ${homeTeamName} pace ${data.homePace.pace.toFixed(1)}, off ${data.homePace.offensiveEfficiency.toFixed(1)}, def ${data.homePace.defensiveEfficiency.toFixed(1)}. Away: ${awayTeamName} pace ${data.awayPace.pace.toFixed(1)}, off ${data.awayPace.offensiveEfficiency.toFixed(1)}, def ${data.awayPace.defensiveEfficiency.toFixed(1)}. Projected total: ${(data.projectedTotal ?? data.impliedTotal ?? 0).toFixed(1)}.`;
+    totalsAI.mutate(
+      { gameId, totalsData: summary },
+      { onSuccess: (result) => setAiAnalysis(result) },
+    );
+  };
+  const total = data as GameTotal | undefined;
+
   const { lineMovement, restAdvantage, situationalAngles, refereeProfile } =
     investigation;
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4" data-ocid="investigation.total.loading_state">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+        <Skeleton className="h-32" />
+        <Skeleton className="h-24" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div
+        className="flex flex-col items-center gap-4 py-16"
+        data-ocid="investigation.total.error_state"
+      >
+        <AlertTriangle className="w-8 h-8 text-destructive" />
+        <p className="font-mono text-sm text-muted-foreground">
+          Failed to load game totals
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          className="font-mono text-xs"
+          data-ocid="investigation.total.retry_button"
+        >
+          <RefreshCw className="w-3 h-3 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // Still waiting for data — show loading skeleton
+  if (!total) {
+    return (
+      <div className="space-y-4" data-ocid="investigation.total.loading_state">
+        <div className="rounded-xl border border-border/40 bg-card/50 px-5 py-4 text-center">
+          <p className="text-xs font-mono text-muted-foreground">
+            Loading game totals analysis…
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+        <Skeleton className="h-32" />
+      </div>
+    );
+  }
+
+  const report = total.confidenceReport;
+  const score = report ? Number(report.score) : 0;
+  const isOver = report?.overUnderEdge?.toUpperCase() === "OVER";
+  const isUnder = report?.overUnderEdge?.toUpperCase() === "UNDER";
+
+  // Split trends: last 5 for each team by alternating or team-based
+  const homeTrends = total.recentTrends.slice(0, 5);
+  const awayTrends = total.recentTrends.slice(5, 10);
+
   return (
-    <div className="space-y-5" data-ocid="investigation.edge_tab">
-      {/* THE PLAY */}
-      <ThePlayCard investigation={investigation} />
-      {/* Line Movement */}
+    <div className="space-y-5" data-ocid="investigation.analysis_tab">
+      {/* 1. Projected total hero + plain-language bet vs posted line */}
+      {(total.projectedTotal ?? total.impliedTotal) && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-xl border border-primary/30 bg-primary/5 p-6 text-center space-y-2"
+        >
+          <div className="text-[10px] font-mono uppercase tracking-widest text-primary">
+            Model Projection
+          </div>
+          <div className="font-display font-bold text-5xl text-primary">
+            {(total.projectedTotal ?? total.impliedTotal)?.toFixed(1)}
+          </div>
+          {postedTotal != null && total.projectedTotal != null ? (
+            (() => {
+              const gap = total.projectedTotal - postedTotal;
+              const absGap = Math.abs(gap);
+              const lean = gap > 0 ? "OVER" : "UNDER";
+              const isSignificant = absGap >= 2;
+              return (
+                <div className="space-y-2 mt-1">
+                  <div className="flex items-center justify-center gap-3 text-sm font-mono text-muted-foreground">
+                    <span>
+                      FanDuel O/U:{" "}
+                      <span className="text-foreground font-bold">
+                        {postedTotal.toFixed(1)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span>
+                      Gap:{" "}
+                      <span
+                        className={cn(
+                          "font-bold",
+                          gap > 0 ? "text-primary" : "text-accent",
+                        )}
+                      >
+                        {gap > 0 ? "+" : ""}
+                        {gap.toFixed(1)}
+                      </span>
+                    </span>
+                  </div>
+                  {isSignificant ? (
+                    <>
+                      <div
+                        className={cn(
+                          "inline-flex items-center gap-2 px-4 py-2 rounded-lg border font-mono font-bold text-sm",
+                          lean === "OVER"
+                            ? "border-primary/60 bg-primary/15 text-primary"
+                            : "border-accent/60 bg-accent/15 text-accent",
+                        )}
+                      >
+                        {lean === "OVER" ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        Take {lean} {postedTotal.toFixed(1)} on FanDuel
+                        <span className="ml-1 text-[10px] opacity-70">
+                          ({absGap.toFixed(1)} pt gap)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={logState !== "idle"}
+                        onClick={() => {
+                          setLogState("pending");
+                          saveBet.mutate(
+                            {
+                              id: crypto.randomUUID(),
+                              gameId,
+                              status: BetStatus.pending,
+                              betType: BetType.gameTotal,
+                              homeTeam: homeTeamName,
+                              awayTeam: awayTeamName,
+                              gameDate: new Date().toLocaleDateString("en-CA"),
+                              description: `${lean} ${postedTotal.toFixed(1)}`,
+                              reasoning: `Model projects ${total.projectedTotal} vs posted ${postedTotal} — gap: ${gap.toFixed(1)} pts`,
+                              recommendedAt: BigInt(Date.now()),
+                              confidence: BigInt(
+                                Math.round(
+                                  Math.min(95, 60 + Math.abs(gap) * 2),
+                                ),
+                              ),
+                              preGameOdds: `${postedTotal.toFixed(1)}`,
+                            },
+                            {
+                              onSuccess: () => {
+                                setLogState("logged");
+                                setTimeout(() => setLogState("idle"), 3000);
+                              },
+                              onError: () => setLogState("idle"),
+                            },
+                          );
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/60 bg-card font-mono text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {logState === "pending"
+                          ? "Logging..."
+                          : logState === "logged"
+                            ? "Logged ✓"
+                            : "Log this bet"}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/40 font-mono text-xs text-muted-foreground">
+                      Line gap too small to bet confidently — skip
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : report?.overUnderEdge ? (
+            <div
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-1.5 rounded-full border font-mono font-bold text-sm",
+                isOver
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : isUnder
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-border text-muted-foreground",
+              )}
+            >
+              {isOver ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              {report.overUnderEdge}
+            </div>
+          ) : null}
+        </motion.div>
+      )}
+
+      {/* 2. Pace cards side by side */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <PaceCard pace={total.awayPace} teamName={awayTeamName} />
+        <PaceCard pace={total.homePace} teamName={homeTeamName} />
+      </div>
+
+      {/* 3. Scoring comparison bars */}
+      {(total.homePace.offensiveEfficiency > 0 ||
+        total.awayPace.offensiveEfficiency > 0) && (
+        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Scoring Comparison
+            </span>
+          </div>
+          <EfficiencyBar
+            label="PPG"
+            homeVal={total.homePace.offensiveEfficiency}
+            awayVal={total.awayPace.offensiveEfficiency}
+            homeTeam={homeTeamName}
+            awayTeam={awayTeamName}
+          />
+          {total.homePace.avgPointsAgainst > 0 &&
+            total.awayPace.avgPointsAgainst > 0 && (
+              <EfficiencyBar
+                label="Opp PPG"
+                homeVal={total.homePace.avgPointsAgainst}
+                awayVal={total.awayPace.avgPointsAgainst}
+                homeTeam={homeTeamName}
+                awayTeam={awayTeamName}
+              />
+            )}
+        </div>
+      )}
+
+      {/* 4. Scoring trends */}
+      {(homeTrends.length > 0 || awayTrends.length > 0) && (
+        <div className="rounded-xl border border-border/60 bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Last 5 Games Scoring Trend
+            </span>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-6">
+            {homeTrends.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-xs font-mono text-foreground">
+                  {homeTeamName}
+                </span>
+                <TrendBars trends={homeTrends} />
+                <div className="flex gap-2 text-[10px] font-mono text-muted-foreground">
+                  {homeTrends.map((t, i) => (
+                    <span
+                      key={i}
+                      className={
+                        t.result === "W"
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {t.teamTotal}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {awayTrends.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-xs font-mono text-foreground">
+                  {awayTeamName}
+                </span>
+                <TrendBars trends={awayTrends} />
+                <div className="flex gap-2 text-[10px] font-mono text-muted-foreground">
+                  {awayTrends.map((t, i) => (
+                    <span
+                      key={i}
+                      className={
+                        t.result === "W"
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {t.teamTotal}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Injury impact */}
+      {total.injuryImpact && (
+        <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-accent" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-accent">
+              Injury Impact
+            </span>
+          </div>
+          <p className="text-sm font-body text-muted-foreground leading-relaxed">
+            {total.injuryImpact}
+          </p>
+        </div>
+      )}
+
+      {/* 6. Edge Signals divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border/40" />
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/60 px-2">
+          Edge Signals
+        </span>
+        <div className="flex-1 h-px bg-border/40" />
+      </div>
+
+      {/* 7. Line Movement */}
       {lineMovement ? (
         <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
           <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
@@ -1710,7 +1573,7 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
         </div>
       )}
 
-      {/* Rest Advantage */}
+      {/* 8. Rest Advantage */}
       {restAdvantage ? (
         <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
           <div className="px-5 py-3 border-b border-border/40">
@@ -1768,7 +1631,7 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
         </div>
       ) : null}
 
-      {/* Situational Angles */}
+      {/* 9. Situational Angles */}
       {situationalAngles.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
           <div className="px-5 py-3 border-b border-border/40">
@@ -1861,17 +1724,96 @@ function EdgeTab({ investigation }: { investigation: GameInvestigation }) {
         </div>
       ) : null}
 
-      {!lineMovement &&
-        !restAdvantage &&
-        situationalAngles.length === 0 &&
-        !refereeProfile && (
-          <div className="rounded-xl border border-border/40 bg-card/40 p-8 text-center space-y-2">
-            <Zap className="w-6 h-6 text-muted-foreground/30 mx-auto" />
-            <p className="text-sm font-body text-muted-foreground">
-              Edge data loads when the game investigation runs with live odds.
+      {/* 10. Confidence meter + AI analysis */}
+      {report && (
+        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
+          <ConfidenceMeter score={score} grade={report.grade} size="lg" />
+          {report.keyFactors.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {report.keyFactors.map((f, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-border/60 bg-muted/60 text-muted-foreground"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Zap className="w-3 h-3 text-primary" />
+            <span className="text-xs font-mono font-bold text-primary">
+              {report.recommendation}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {report?.reasoning && (
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
+              AI Analysis
+            </span>
+          </div>
+          <blockquote className="border-l-2 border-primary/40 pl-4">
+            <p className="text-sm font-body text-muted-foreground leading-relaxed">
+              {report.reasoning}
             </p>
+          </blockquote>
+          {report.projectedTotal !== undefined && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                Projected total:
+              </span>
+              <span className="font-display font-bold text-primary">
+                {report.projectedTotal.toFixed(1)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 11. Deeper AI analysis button */}
+      <div className="rounded-xl border border-border/40 bg-card/60 p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
+              Deeper AI Analysis
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAIAnalyze}
+            disabled={totalsAI.isPending || !data}
+            className="font-mono text-xs"
+            data-ocid="investigation.total.ai_analyze_button"
+          >
+            <Brain className="w-3 h-3 mr-1.5" />
+            {totalsAI.isPending
+              ? "Analyzing…"
+              : aiAnalysis
+                ? "Re-analyze"
+                : "Analyze with AI"}
+          </Button>
+        </div>
+        {aiAnalysis && (
+          <div className="border-l-2 border-primary/40 pl-4">
+            <MarkdownBlock text={aiAnalysis} />
           </div>
         )}
+        {totalsAI.isError && (
+          <p
+            className="text-xs font-mono text-destructive"
+            data-ocid="investigation.total.ai_error_state"
+          >
+            AI analysis failed — contact support if this persists
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -1975,7 +1917,7 @@ function InvestigationSkeleton() {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-type TabId = "props" | "total" | "odds" | "edge";
+type TabId = "props" | "analysis" | "odds";
 
 export default function InvestigationPage() {
   const { gameId } = useParams({ from: "/game/$gameId" });
@@ -2086,9 +2028,29 @@ export default function InvestigationPage() {
     ? Number(investigation.odds[0].overUnder)
     : undefined;
 
+  // Build one-line odds strip from investigation.odds[0]
+  const oddsSnap = investigation.odds[0];
+  const awayAbbr = awayTeam.abbreviation;
+  const oddsStrip = oddsSnap
+    ? [
+        oddsSnap.awaySpread != null
+          ? `${awayAbbr} ${oddsSnap.awaySpread > 0 ? "+" : ""}${oddsSnap.awaySpread} spread`
+          : null,
+        oddsSnap.overUnder != null ? `O/U ${oddsSnap.overUnder}` : null,
+        oddsSnap.awayMoneyline != null
+          ? `${awayAbbr} ML ${formatMoneyline(oddsSnap.awayMoneyline)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+
+  // Compute the play for the hero section
+  const thePlay = computeThePlay(investigation);
+
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-0">
-      {/* Back nav */}
+      {/* 1. Back nav */}
       <div className="flex items-center gap-2 mb-4">
         <Link
           to="/"
@@ -2104,7 +2066,7 @@ export default function InvestigationPage() {
         </span>
       </div>
 
-      {/* Sticky game header */}
+      {/* 2. Sticky game header */}
       <div
         className="sticky top-0 z-10 rounded-xl border border-border/60 bg-card/95 backdrop-blur-sm p-5 mb-0 space-y-3"
         data-ocid="investigation.game_header"
@@ -2144,6 +2106,12 @@ export default function InvestigationPage() {
                 </span>
               )}
             </div>
+            {/* Odds strip */}
+            {oddsStrip && (
+              <p className="mt-1.5 text-[10px] font-mono text-muted-foreground/70 tracking-wide">
+                {oddsStrip}
+              </p>
+            )}
           </div>
           <div className="flex gap-4">
             <div className="text-center">
@@ -2169,7 +2137,14 @@ export default function InvestigationPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
+      {/* 3. "The Play" hero — above tabs, always visible */}
+      {thePlay && (
+        <div className="mt-5" data-ocid="investigation.the_play_hero">
+          <ThePlayCard investigation={investigation} />
+        </div>
+      )}
+
+      {/* 4. Three-tab bar */}
       <div
         className="flex border-b border-border/40 mt-5 mb-5"
         data-ocid="investigation.tabs"
@@ -2181,7 +2156,7 @@ export default function InvestigationPage() {
         >
           <span className="flex items-center gap-1.5">
             <BarChart3 className="w-3 h-3" />
-            Player Stats
+            Player Props
             {hasLiveProps && (
               <span className="text-[9px] font-mono text-primary/80 leading-none">
                 (Live)
@@ -2190,13 +2165,13 @@ export default function InvestigationPage() {
           </span>
         </TabButton>
         <TabButton
-          active={activeTab === "total"}
-          onClick={() => setActiveTab("total")}
-          ocid="investigation.tab.total"
+          active={activeTab === "analysis"}
+          onClick={() => setActiveTab("analysis")}
+          ocid="investigation.tab.analysis"
         >
           <span className="flex items-center gap-1.5">
-            <TrendingUp className="w-3 h-3" />
-            Game Total
+            <Activity className="w-3 h-3" />
+            Game Analysis
           </span>
         </TabButton>
         <TabButton
@@ -2207,16 +2182,6 @@ export default function InvestigationPage() {
           <span className="flex items-center gap-1.5">
             <Swords className="w-3 h-3" />
             All Odds
-          </span>
-        </TabButton>
-        <TabButton
-          active={activeTab === "edge"}
-          onClick={() => setActiveTab("edge")}
-          ocid="investigation.tab.edge"
-        >
-          <span className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3" />
-            Edge
           </span>
         </TabButton>
       </div>
@@ -2230,17 +2195,17 @@ export default function InvestigationPage() {
             isActiveTab={activeTab === "props"}
           />
         )}
-        {activeTab === "total" && (
-          <GameTotalTab
+        {activeTab === "analysis" && (
+          <GameAnalysisPanel
             gameId={gameId}
             homeTeamName={teamFullName(homeTeam.city, homeTeam.name)}
             awayTeamName={teamFullName(awayTeam.city, awayTeam.name)}
-            isActiveTab={activeTab === "total"}
+            isActiveTab={activeTab === "analysis"}
             postedTotal={postedTotal}
+            investigation={investigation}
           />
         )}
         {activeTab === "odds" && <AllOddsTab investigation={investigation} />}
-        {activeTab === "edge" && <EdgeTab investigation={investigation} />}
       </div>
     </div>
   );
