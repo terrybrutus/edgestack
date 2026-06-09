@@ -18,6 +18,7 @@ import type {
   LineMovement,
   OddsLine,
   PlayerPropsAnalysis,
+  PropLine,
   TeamStats,
 } from "@/types";
 import { analyzeNbaEdge } from "./analysis";
@@ -296,8 +297,23 @@ export async function fetchActivePlayersForGame(
   const avgs = await fetchSeasonAverages(playerIds, bdlGame.season);
   const avgMap = new Map(avgs.map((a) => [a.player_id, a]));
 
+  const { fetchPlayerPropsFromOdds } = await import("./odds");
+  const oddsProps = await fetchPlayerPropsFromOdds(
+    bdlGame.home_team.name,
+    bdlGame.visitor_team.name,
+  ).catch(() => []);
+
   const props = allPlayers.map((p) => {
     const avg = avgMap.get(p.id);
+    const playerOddsLines = oddsProps.filter((op) =>
+      op.playerName.toLowerCase().includes(p.last_name.toLowerCase()),
+    );
+    const lines = playerOddsLines.map((op) => ({
+      bookmaker: op.bookmaker,
+      line: op.line,
+      overOdds: BigInt(op.overOdds),
+      underOdds: BigInt(op.underOdds),
+    }));
     return {
       player: {
         id: String(p.id),
@@ -313,9 +329,7 @@ export async function fetchActivePlayersForGame(
       homeAwaySplit: 0,
       backToBack: false,
       recentGames: [],
-      // propLines left empty — no real market lines available from BDL.
-      // Season averages are shown via seasonAvgPoints/Reb/Ast instead.
-      propLines: [],
+      propLines: lines,
     };
   });
 

@@ -115,3 +115,141 @@ export function formatAmerican(odds: number | null): string {
   if (odds === null) return "N/A";
   return odds > 0 ? `+${odds}` : `${odds}`;
 }
+
+// ── Player prop lines ─────────────────────────────────────────────────────────
+
+export interface OddsPlayerProp {
+  playerName: string;
+  market: "points" | "rebounds" | "assists";
+  line: number;
+  overOdds: number; // American
+  underOdds: number; // American
+  bookmaker: string;
+}
+
+const propsCache = new Map<string, { data: OddsPlayerProp[]; at: number }>();
+const PROPS_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+interface PlayerPropsOutcome {
+  name: string;
+  description?: string;
+  price: number;
+  point?: number;
+}
+
+interface PlayerPropsMarket {
+  key: string;
+  outcomes: PlayerPropsOutcome[];
+}
+
+interface PlayerPropsBookmaker {
+  key: string;
+  title: string;
+  markets: PlayerPropsMarket[];
+}
+
+interface PlayerPropsEvent {
+  bookmakers: PlayerPropsBookmaker[];
+}
+
+export async function fetchPlayerPropsFromOdds(
+  homeTeam: string,
+  awayTeam: string,
+  sport = "basketball_nba",
+): Promise<OddsPlayerProp[]> {
+  // 1. Get all events (cached by fetchOdds internally if called before)
+  const events = await fetchOdds(
+    sport as "basketball_nba" | "baseball_mlb",
+    "spreads,totals,h2h",
+  );
+
+  // 2. Find matching event using fuzzy last-word matching
+  const lastWord = (s: string) =>
+    s.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+  const homeLast = lastWord(homeTeam);
+  const awayLast = lastWord(awayTeam);
+
+  const event = events.find(
+    (e) =>
+      e.home_team.toLowerCase().includes(homeLast) ||
+      e.away_team.toLowerCase().includes(awayLast),
+  );
+
+  if (!event) return [];
+
+  const cacheKey = `${event.id}`;
+  const cached = propsCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < PROPS_CACHE_TTL) {
+    return cached.data;
+  }
+
+  // 3. Fetch player props for this event
+  const url =
+    `${CONFIG.ODDS_BASE}/sports/${sport}/events/${event.id}/odds` +
+    `?apiKey=${CONFIG.ODDS_API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`;
+
+  const res = await fetch(url);
+  if (!res.ok) return [];
+
+  const propsEvent: PlayerPropsEvent = await res.json();
+
+  // 4. Parse outcomes — prefer FanDuel then DraftKings
+  const PREFERRED = ["fanduel", "draftkings"];
+  const sorted = [...(propsEvent.bookmakers ?? [])].sort((a, b) => {
+    const ai = PREFERRED.indexOf(a.key);
+    const bi = PREFERRED.indexOf(b.key);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  const marketKeyMap: Record<string, OddsPlayerProp["market"]> = {
+    player_points: "points",
+    player_rebounds: "rebounds",
+    player_assists: "assists",
+  };
+
+  // Deduplicate by playerName+market — prefer first (FanDuel)
+  const seen = new Set<string>();
+  const results: OddsPlayerProp[] = [];
+
+  for (const bm of sorted) {
+    // Only use FanDuel or DraftKings
+    if (!PREFERRED.includes(bm.key)) continue;
+
+    for (const market of bm.markets) {
+      const marketType = marketKeyMap[market.key];
+      if (!marketType) continue;
+
+      // Group outcomes by player description
+      const byPlayer = new Map<
+        string,
+        { over?: PlayerPropsOutcome; under?: PlayerPropsOutcome }
+      >();
+      for (const outcome of market.outcomes) {
+        const playerName = outcome.description ?? outcome.name;
+        if (!byPlayer.has(playerName)) byPlayer.set(playerName, {});
+        const entry = byPlayer.get(playerName)!;
+        if (outcome.name === "Over") entry.over = outcome;
+        else if (outcome.name === "Under") entry.under = outcome;
+      }
+
+      for (const [playerName, { over, under }] of byPlayer) {
+        if (!over || !under || over.point === undefined) continue;
+        const dedupeKey = `${playerName}|${marketType}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
+        results.push({
+          playerName,
+          market: marketType,
+          line: over.point,
+          overOdds: over.price,
+          underOdds: under.price,
+          bookmaker: bm.key,
+        });
+      }
+    }
+  }
+
+  propsCache.set(cacheKey, { data: results, at: Date.now() });
+  return results;
+}

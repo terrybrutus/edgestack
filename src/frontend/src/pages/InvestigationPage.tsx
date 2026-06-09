@@ -622,8 +622,8 @@ function PlayerPropsTab({
         >
           <BarChart3 className="w-10 h-10 text-muted-foreground/40" />
           <p className="font-mono text-sm text-muted-foreground text-center max-w-xs">
-            No player stat data available for this game. BDL free tier doesn't
-            provide live prop lines — season averages shown where available.
+            No prop lines available for this game. Try opening a game closer to
+            tip-off — lines appear 1-2 hours before game time.
           </p>
         </div>
       )}
@@ -1990,6 +1990,11 @@ export default function InvestigationPage() {
   } = useGameDetail(gameId, gameDate ?? "");
   const [activeTab, setActiveTab] = useState<TabId>("props");
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const { data: propsData } = usePlayerProps(gameId, true);
+  const hasLiveProps =
+    (propsData as PlayerPropsAnalysis | undefined)?.players.some(
+      (p) => p.propLines.length > 0,
+    ) ?? false;
 
   // Auto-refresh for live games
   useEffect(() => {
@@ -2177,6 +2182,11 @@ export default function InvestigationPage() {
           <span className="flex items-center gap-1.5">
             <BarChart3 className="w-3 h-3" />
             Player Stats
+            {hasLiveProps && (
+              <span className="text-[9px] font-mono text-primary/80 leading-none">
+                (Live)
+              </span>
+            )}
           </span>
         </TabButton>
         <TabButton
