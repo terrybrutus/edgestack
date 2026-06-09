@@ -10,8 +10,12 @@ export function useNtfyTopic() {
     () => localStorage.getItem("ntfy_topic") ?? "",
   );
   const save = (val: string) => {
-    setTopic(val);
-    if (val.trim()) localStorage.setItem("ntfy_topic", val.trim());
+    const clean = val
+      .replace(/^https?:\/\/ntfy\.sh\//i, "")
+      .replace(/^ntfy\.sh\//i, "")
+      .trim();
+    setTopic(clean);
+    if (clean) localStorage.setItem("ntfy_topic", clean);
     else localStorage.removeItem("ntfy_topic");
   };
   return { topic, save };
@@ -23,8 +27,14 @@ export async function sendNtfyNotification(
   body: string,
 ) {
   if (!topic) return;
+  // Strip accidental domain prefix — user may type "ntfy.sh/my-topic" instead of "my-topic"
+  const cleanTopic = topic
+    .replace(/^https?:\/\/ntfy\.sh\//i, "")
+    .replace(/^ntfy\.sh\//i, "")
+    .trim();
+  if (!cleanTopic) return;
   try {
-    await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+    await fetch(`https://ntfy.sh/${encodeURIComponent(cleanTopic)}`, {
       method: "POST",
       headers: { Title: title, Priority: "high", Tags: "money_with_wings" },
       body,
@@ -156,11 +166,28 @@ function NtfySection() {
           )}
         </Button>
       </div>
-      {input.trim() !== topic && input.trim() && (
-        <p className="text-[10px] font-mono text-muted-foreground/60">
-          Hit "Send Test" to save and verify this topic.
-        </p>
-      )}
+      {(() => {
+        const clean = input
+          .replace(/^https?:\/\/ntfy\.sh\//i, "")
+          .replace(/^ntfy\.sh\//i, "")
+          .trim();
+        const hasPrefix = clean !== input.trim() && input.trim().length > 0;
+        return (
+          <>
+            {hasPrefix && (
+              <p className="text-[10px] font-mono text-accent">
+                Just the topic name needed — will use:{" "}
+                <span className="font-bold">{clean}</span>
+              </p>
+            )}
+            {!hasPrefix && input.trim() !== topic && input.trim() && (
+              <p className="text-[10px] font-mono text-muted-foreground/60">
+                Hit "Send Test" to save and verify this topic.
+              </p>
+            )}
+          </>
+        );
+      })()}
     </motion.div>
   );
 }
