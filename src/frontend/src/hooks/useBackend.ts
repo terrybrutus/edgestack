@@ -468,7 +468,8 @@ export function usePlays() {
 
       // ── NBA plays ───────────────────────────────────────────────────────────
       const { analyzeNbaEdge } = await import("@/services/analysis");
-      const { fetchGamesForDate } = await import("@/services/games-facade");
+      const { fetchGamesForDate, fetchTeamLastNGames, computeRestDays } =
+        await import("@/services/games-facade");
       const { fetchOdds, parseOddsEvent } = await import("@/services/odds");
 
       const [bdlGames, nbaOdds] = await Promise.allSettled([
@@ -482,12 +483,18 @@ export function usePlays() {
 
       await Promise.all(
         games.map(async (g) => {
-          // Skip fetchTeamLastNGames here — each call queues through the BDL
-          // rate-limiter and serializes at 1 req/sec. With 5+ games that's 10+
-          // extra seconds blocking the plays page. Rest days default to 3 (a
-          // neutral assumption); the detailed game view has the full data.
-          const homeRestDays = 3;
-          const awayRestDays = 3;
+          const season = g.season;
+          const [homeGames, awayGames] = await Promise.allSettled([
+            fetchTeamLastNGames(g.home_team.id, season, 5),
+            fetchTeamLastNGames(g.visitor_team.id, season, 5),
+          ]);
+          const homeRecent =
+            homeGames.status === "fulfilled" ? homeGames.value : [];
+          const awayRecent =
+            awayGames.status === "fulfilled" ? awayGames.value : [];
+
+          const homeRestDays = computeRestDays(homeRecent, today);
+          const awayRestDays = computeRestDays(awayRecent, today);
 
           const oddsEvent = oddsEvents.find(
             (e) =>
@@ -500,6 +507,62 @@ export function usePlays() {
           );
           const parsedOdds = oddsEvent ? parseOddsEvent(oddsEvent) : null;
 
+          // ── Projected total vs posted O/U ─────────────────────────────────
+          // Compute from scoring averages — this is the signal shown on the
+          // Game Total tab. If it diverges ≥4 pts from the posted line, add
+          // it as an explicit OVER/UNDER signal so it surfaces on this page.
+          const avg = (arr: number[]) =>
+            arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+          const validHome = homeRecent.filter(
+            (r) => r.home_team_score > 0 || r.visitor_team_score > 0,
+          );
+          const validAway = awayRecent.filter(
+            (r) => r.home_team_score > 0 || r.visitor_team_score > 0,
+          );
+          const homeScores = validHome.map((r) =>
+            r.home_team.id === g.home_team.id
+              ? r.home_team_score
+              : r.visitor_team_score,
+          );
+          const awayScores = validAway.map((r) =>
+            r.visitor_team.id === g.visitor_team.id
+              ? r.visitor_team_score
+              : r.home_team_score,
+          );
+          const homePPG = avg(homeScores);
+          const awayPPG = avg(awayScores);
+          const projectedTotal =
+            homePPG !== null && awayPPG !== null
+              ? Math.round((homePPG + awayPPG) * 10) / 10
+              : null;
+          const postedTotal = parsedOdds?.total ?? null;
+
+          type Direction = "OVER" | "UNDER" | "HOME" | "AWAY";
+          const extraSignals: Array<{
+            category: string;
+            description: string;
+            confidence: number;
+            direction: Direction;
+          }> = [];
+
+          if (
+            projectedTotal !== null &&
+            postedTotal !== null &&
+            Math.abs(projectedTotal - postedTotal) >= 4
+          ) {
+            const gap = projectedTotal - postedTotal;
+            const dir: Direction = gap > 0 ? "OVER" : "UNDER";
+            extraSignals.push({
+              category: "Projected Total",
+              description: `Model projects ${projectedTotal} vs posted ${postedTotal} — gap: ${gap > 0 ? "+" : ""}${gap.toFixed(1)} pts`,
+              confidence:
+                Math.abs(gap) >= 8 ? 72 : Math.abs(gap) >= 6 ? 68 : 62,
+              direction: dir,
+            });
+          }
+
+          // ── Edge analysis (spread, rest, moneyline) ───────────────────────
           const edge = analyzeNbaEdge({
             gameId: String(g.id),
             homeTeam: g.home_team.name,
@@ -518,65 +581,91 @@ export function usePlays() {
             isPlayoffs: g.postseason,
           });
 
-          if (edge.convergenceCount >= 2 && edge.recommendation !== "PASS") {
-            const rec = edge.recommendation;
-            let betText = "";
-            if (rec === "HOME" && parsedOdds?.homeSpread != null) {
-              const s = parsedOdds.homeSpread;
-              betText = `${g.home_team.abbreviation} ${s > 0 ? "+" : ""}${s}`;
-            } else if (rec === "AWAY" && parsedOdds?.awaySpread != null) {
-              const s = parsedOdds.awaySpread;
-              betText = `${g.visitor_team.abbreviation} ${s > 0 ? "+" : ""}${s}`;
-            } else if (rec === "OVER" && parsedOdds?.total != null) {
-              betText = `Over ${parsedOdds.total}`;
-            } else if (rec === "UNDER" && parsedOdds?.total != null) {
-              betText = `Under ${parsedOdds.total}`;
-            } else {
-              betText =
-                rec === "HOME"
-                  ? `${g.home_team.abbreviation} ML`
-                  : rec === "AWAY"
-                    ? `${g.visitor_team.abbreviation} ML`
-                    : rec === "OVER"
-                      ? "Over"
-                      : "Under";
-            }
+          // Merge edge signals with extra signals and check convergence
+          const allSignals = [
+            ...edge.signals.map((s) => ({
+              category: s.category,
+              description: s.description,
+              confidence: s.confidence,
+              direction: s.direction as Direction,
+            })),
+            ...extraSignals,
+          ];
 
-            const displayStatus = g.status ?? "";
-            let displayTime = "TBD";
-            if (displayStatus.includes("T") && displayStatus.includes("Z")) {
-              const d = new Date(displayStatus);
-              if (!Number.isNaN(d.getTime())) {
-                displayTime = d.toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                  timeZone: "America/New_York",
-                  timeZoneName: "short",
-                });
-              }
-            }
-
-            nbaPlays.push({
-              sport: "NBA",
-              gameLabel: `${g.visitor_team.abbreviation} @ ${g.home_team.abbreviation}`,
-              gameId: String(g.id),
-              displayTime,
-              betText,
-              confidence: edge.stackConfidence,
-              convergenceCount: edge.convergenceCount,
-              summaryText: edge.summary,
-              signals: edge.signals
-                .filter((s) => s.direction === rec)
-                .map((s) => ({
-                  name: s.category,
-                  description: s.description,
-                  confidence: s.confidence,
-                })),
-              linkTo: "/game/$gameId",
-              linkParams: { gameId: String(g.id) },
-              linkSearch: { gameDate: today },
-            });
+          const dirCount: Record<string, number> = {};
+          for (const s of allSignals) {
+            dirCount[s.direction] = (dirCount[s.direction] ?? 0) + 1;
           }
+          const sorted = Object.entries(dirCount).sort((a, b) => b[1] - a[1]);
+          if (!sorted.length || sorted[0][1] < 2) return;
+
+          const [topDir, topCount] = sorted[0];
+          const aligned = allSignals.filter((s) => s.direction === topDir);
+          const avgConf =
+            aligned.reduce((a, b) => a + b.confidence, 0) / aligned.length;
+          const bonus = Math.min(20, (topCount - 1) * 7);
+          const confidence = Math.min(95, Math.round(avgConf + bonus));
+
+          const rec = topDir as Direction;
+          let betText = "";
+          if (rec === "HOME" && parsedOdds?.homeSpread != null) {
+            const s = parsedOdds.homeSpread;
+            betText = `${g.home_team.abbreviation} ${s > 0 ? "+" : ""}${s}`;
+          } else if (rec === "AWAY" && parsedOdds?.awaySpread != null) {
+            const s = parsedOdds.awaySpread;
+            betText = `${g.visitor_team.abbreviation} ${s > 0 ? "+" : ""}${s}`;
+          } else if (rec === "OVER" && parsedOdds?.total != null) {
+            betText = `Over ${parsedOdds.total} on FanDuel`;
+          } else if (rec === "UNDER" && parsedOdds?.total != null) {
+            betText = `Under ${parsedOdds.total} on FanDuel`;
+          } else {
+            betText =
+              rec === "HOME"
+                ? `${g.home_team.abbreviation} ML`
+                : rec === "AWAY"
+                  ? `${g.visitor_team.abbreviation} ML`
+                  : rec === "OVER"
+                    ? "Over"
+                    : "Under";
+          }
+
+          const displayStatus = g.status ?? "";
+          let displayTime = "TBD";
+          if (displayStatus.includes("T") && displayStatus.includes("Z")) {
+            const d = new Date(displayStatus);
+            if (!Number.isNaN(d.getTime())) {
+              displayTime = d.toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                timeZone: "America/New_York",
+                timeZoneName: "short",
+              });
+            }
+          } else if (
+            displayStatus.toLowerCase().includes("q") ||
+            displayStatus.toLowerCase().includes("half")
+          ) {
+            displayTime = "LIVE";
+          }
+
+          nbaPlays.push({
+            sport: "NBA",
+            gameLabel: `${g.visitor_team.abbreviation} @ ${g.home_team.abbreviation}`,
+            gameId: String(g.id),
+            displayTime,
+            betText,
+            confidence,
+            convergenceCount: topCount,
+            summaryText: `${topCount} signal${topCount > 1 ? "s" : ""} converging ${topDir} — ${topCount >= 3 ? "high" : "moderate"} conviction`,
+            signals: aligned.map((s) => ({
+              name: s.category,
+              description: s.description,
+              confidence: s.confidence,
+            })),
+            linkTo: "/game/$gameId",
+            linkParams: { gameId: String(g.id) },
+            linkSearch: { gameDate: today },
+          });
         }),
       );
 
