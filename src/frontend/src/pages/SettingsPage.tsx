@@ -25,22 +25,27 @@ export async function sendNtfyNotification(
   topic: string,
   title: string,
   body: string,
+  throwOnError = false,
 ) {
   if (!topic) return;
-  // Strip accidental domain prefix — user may type "ntfy.sh/my-topic" instead of "my-topic"
   const cleanTopic = topic
     .replace(/^https?:\/\/ntfy\.sh\//i, "")
     .replace(/^ntfy\.sh\//i, "")
     .trim();
   if (!cleanTopic) return;
   try {
-    await fetch(`https://ntfy.sh/${encodeURIComponent(cleanTopic)}`, {
-      method: "POST",
-      headers: { Title: title, Priority: "high", Tags: "money_with_wings" },
-      body,
-    });
-  } catch {
-    // non-critical — notification is best-effort
+    const res = await fetch(
+      `https://ntfy.sh/${encodeURIComponent(cleanTopic)}`,
+      {
+        method: "POST",
+        headers: { Title: title, Priority: "high", Tags: "money_with_wings" },
+        body,
+      },
+    );
+    if (!res.ok) throw new Error(`ntfy returned ${res.status}`);
+  } catch (e) {
+    if (throwOnError) throw e;
+    // non-critical for background notifications — best-effort only
   }
 }
 
@@ -60,6 +65,7 @@ function NtfySection() {
         t,
         "EdgeStack — Test Notification",
         "Notifications are working. You'll be alerted when new plays are detected.",
+        true, // throw on error so we can show real status
       );
       setStatus("sent");
       setTimeout(() => setStatus("idle"), 3000);
@@ -192,6 +198,76 @@ function NtfySection() {
   );
 }
 
+// ── Bankroll setting ──────────────────────────────────────────────────────────
+function BankrollSection() {
+  const [input, setInput] = useState(
+    () => localStorage.getItem("bankroll") ?? "100",
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    const val = Number.parseFloat(input);
+    if (Number.isNaN(val) || val <= 0) return;
+    localStorage.setItem("bankroll", String(val));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: 0.28 }}
+      className="rounded-xl border border-border/50 bg-card p-4 space-y-3"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-muted/40 border border-border/40 flex items-center justify-center shrink-0 text-base">
+          💰
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-sm font-semibold text-foreground">
+            Betting Bankroll
+          </h3>
+          <p className="text-[11px] font-body text-muted-foreground">
+            Used to calculate recommended bet sizes on play cards (quarter-Kelly
+            formula)
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2 items-center">
+        <span className="text-sm font-mono text-muted-foreground">$</span>
+        <input
+          type="number"
+          min="1"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="flex-1 px-3 py-1.5 rounded-md border border-border/60 bg-background text-sm font-mono text-foreground focus:outline-none focus:border-primary/60 transition-colors"
+          placeholder="100"
+        />
+        <Button
+          size="sm"
+          variant={saved ? "default" : "outline"}
+          onClick={handleSave}
+          className="font-mono text-xs shrink-0"
+        >
+          {saved ? (
+            <>
+              <CheckCircle2 className="w-3 h-3 mr-1.5" />
+              Saved
+            </>
+          ) : (
+            "Save"
+          )}
+        </Button>
+      </div>
+      <p className="text-[10px] font-mono text-muted-foreground/50">
+        Quarter-Kelly means bet ~25% of what the math says — the safe, standard
+        approach. At $100 bankroll + 72% confidence: suggest ~$11.
+      </p>
+    </motion.div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const apis = [
@@ -235,6 +311,7 @@ export default function SettingsPage() {
 
       <div className="space-y-3">
         <NtfySection />
+        <BankrollSection />
 
         <div className="pt-2 pb-1">
           <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">

@@ -1,18 +1,54 @@
+import { BetStatus, BetType } from "@/backend";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { type AnyPlay, usePlays } from "@/hooks/useBackend";
+import {
+  type AnyPlay,
+  usePlays,
+  useSaveBetRecommendation,
+} from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { sendNtfyNotification } from "@/pages/SettingsPage";
 import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowRight,
+  BookmarkPlus,
+  CheckCircle2,
   ChevronRight,
   ExternalLink,
   Target,
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// ── Kelly Criterion bet sizing ────────────────────────────────────────────────
+// Returns recommended bet as % of bankroll (quarter-Kelly, standard safe sizing)
+function kellySize(confidencePct: number, americanOdds = -110): number {
+  const p = confidencePct / 100;
+  const decimal =
+    americanOdds < 0
+      ? 100 / Math.abs(americanOdds) + 1
+      : americanOdds / 100 + 1;
+  const q = 1 - p;
+  const b = decimal - 1;
+  const kelly = (p * b - q) / b;
+  const quarterKelly = Math.max(0, kelly / 4);
+  return Math.round(quarterKelly * 100 * 10) / 10; // as % of bankroll
+}
+
+// Plain-language bet type label
+function betTypeLabel(play: AnyPlay): string {
+  if (play.betType === "total") {
+    return play.sport === "MLB"
+      ? `Game total (combined runs scored by both teams)`
+      : `Game total (combined points scored by both teams)`;
+  }
+  if (play.betType === "spread") {
+    return `Point spread (team must win by/within the listed margin)`;
+  }
+  return `Moneyline (just pick the winner, no margin required)`;
+}
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
 function ConfidenceBadge({ value }: { value: number }) {
@@ -55,6 +91,44 @@ function SportBadge({ sport }: { sport: "NBA" | "MLB" }) {
 function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
   const isHot = play.confidence >= 75;
   const isSolid = play.confidence >= 65 && !isHot;
+  const saveBet = useSaveBetRecommendation();
+  const [logStatus, setLogStatus] = useState<"idle" | "logged" | "error">(
+    "idle",
+  );
+
+  const kellySuggest = kellySize(play.confidence);
+  const bankroll = Number(localStorage.getItem("bankroll") ?? "100");
+  const kellyDollars = Math.round((kellySuggest / 100) * bankroll * 100) / 100;
+
+  const handleLogBet = async () => {
+    try {
+      await saveBet.mutateAsync({
+        id: crypto.randomUUID(),
+        status: BetStatus.pending,
+        betType:
+          play.betType === "total"
+            ? BetType.gameTotal
+            : play.betType === "spread"
+              ? BetType.spread
+              : BetType.spread,
+        gameId: play.gameId,
+        homeTeam: play.gameLabel.split(" @ ")[1] ?? "",
+        awayTeam: play.gameLabel.split(" @ ")[0] ?? "",
+        gameDate: new Date().toLocaleDateString("en-CA"),
+        description: play.betText,
+        reasoning: play.summaryText,
+        recommendedAt: BigInt(Date.now()),
+        confidence: BigInt(play.confidence),
+        preGameOdds:
+          play.postedLine != null ? String(play.postedLine) : undefined,
+      });
+      setLogStatus("logged");
+      setTimeout(() => setLogStatus("idle"), 3000);
+    } catch {
+      setLogStatus("error");
+      setTimeout(() => setLogStatus("idle"), 3000);
+    }
+  };
 
   return (
     <motion.div
@@ -70,7 +144,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
             : "border-border/60 bg-card",
       )}
     >
-      {/* Accent bar — thicker & brighter for hot plays */}
+      {/* Accent bar */}
       <div
         className={cn(
           "bg-gradient-to-r to-transparent",
@@ -99,7 +173,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           </span>
         </div>
 
-        {/* Bet text — larger for hot plays */}
+        {/* Bet text */}
         <div>
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-1">
             Bet on FanDuel
@@ -112,9 +186,36 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           >
             {play.betText}
           </p>
+          {/* Plain-language bet type explanation */}
+          <p className="text-[10px] font-mono text-muted-foreground/50 mt-0.5 italic">
+            {betTypeLabel(play)}
+          </p>
           <p className="text-xs font-mono text-muted-foreground/70 mt-1">
             {play.summaryText}
           </p>
+        </div>
+
+        {/* Kelly bet size suggestion */}
+        <div className="rounded-lg bg-muted/30 border border-border/30 px-3 py-2 flex items-center justify-between">
+          <div>
+            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50">
+              Suggested bet size
+            </p>
+            <p className="text-sm font-mono font-bold text-foreground">
+              ${kellyDollars.toFixed(2)}
+              <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                ({kellySuggest}% of bankroll)
+              </span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50">
+              Quarter-Kelly formula
+            </p>
+            <p className="text-[10px] font-mono text-muted-foreground/60">
+              Bankroll: ${bankroll} · Set in Settings
+            </p>
+          </div>
         </div>
 
         {/* Evidence bullets */}
@@ -145,7 +246,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
           <a
             href={
               play.linkTo === "/game/$gameId"
@@ -157,6 +258,27 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
             Full Analysis
             <ChevronRight className="w-3 h-3" />
           </a>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleLogBet}
+            disabled={logStatus === "logged" || saveBet.isPending}
+            className="font-mono text-[10px] h-7 px-3"
+          >
+            {logStatus === "logged" ? (
+              <>
+                <CheckCircle2 className="w-3 h-3 mr-1.5 text-primary" />
+                Logged
+              </>
+            ) : logStatus === "error" ? (
+              "Error"
+            ) : (
+              <>
+                <BookmarkPlus className="w-3 h-3 mr-1.5" />
+                Log Bet
+              </>
+            )}
+          </Button>
           <span className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/40 text-muted-foreground/60 text-[10px] font-mono uppercase tracking-widest cursor-not-allowed select-none">
             <ExternalLink className="w-3 h-3" />
             FanDuel →
