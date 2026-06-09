@@ -617,8 +617,9 @@ function PlayerPropsTab({
           data-ocid="investigation.props.empty_state"
         >
           <BarChart3 className="w-10 h-10 text-muted-foreground/40" />
-          <p className="font-mono text-sm text-muted-foreground">
-            No player props available yet
+          <p className="font-mono text-sm text-muted-foreground text-center max-w-xs">
+            No player stat data available for this game. BDL free tier doesn't
+            provide live prop lines — season averages shown where available.
           </p>
         </div>
       )}
@@ -2097,7 +2098,7 @@ export default function InvestigationPage() {
         >
           <span className="flex items-center gap-1.5">
             <BarChart3 className="w-3 h-3" />
-            Player Props
+            Player Stats
           </span>
         </TabButton>
         <TabButton
