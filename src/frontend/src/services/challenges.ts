@@ -39,35 +39,45 @@ export interface Challenge {
 
 export const CHALLENGE_PRESETS: Record<
   ChallengeType,
-  { label: string; description: string; defaultTarget: (start: number) => number; icon: string }
+  {
+    label: string;
+    description: string;
+    defaultTarget: (start: number) => number;
+    icon: string;
+  }
 > = {
   doubler: {
     label: "Bankroll Doubler",
-    description: "Start with any amount. Bet to double it. Each bet is sized to make steady progress without going bust.",
+    description:
+      "Start with any amount. Bet to double it. Each bet is sized to make steady progress without going bust.",
     defaultTarget: (s) => s * 2,
     icon: "⚡",
   },
   ten_to_10k: {
     label: "$10 to $10K",
-    description: "The classic challenge. Start with $10, grind to $10,000 using only high-confidence plays. Takes ~30 winning bets.",
+    description:
+      "The classic challenge. Start with $10, grind to $10,000 using only high-confidence plays. Takes ~30 winning bets.",
     defaultTarget: () => 10000,
     icon: "🏆",
   },
   kelly_growth: {
     label: "Kelly Growth",
-    description: "No fixed target. Every bet is sized by the Kelly Criterion formula. Track steady bankroll growth over time.",
+    description:
+      "No fixed target. Every bet is sized by the Kelly Criterion formula. Track steady bankroll growth over time.",
     defaultTarget: () => 0,
     icon: "📈",
   },
   streak: {
     label: "Win Streak",
-    description: "Track your longest consecutive win streak. Flat bet $10 per play. No compounding — pure skill tracking.",
+    description:
+      "Track your longest consecutive win streak. Flat bet $10 per play. No compounding — pure skill tracking.",
     defaultTarget: () => 0,
     icon: "🔥",
   },
   parlay_ladder: {
     label: "Parlay Ladder",
-    description: "2-leg parlays only (pays ~2.6x). Start with a small amount and try to ladder up. Higher variance, higher reward.",
+    description:
+      "2-leg parlays only (pays ~2.6x). Start with a small amount and try to ladder up. Higher variance, higher reward.",
     defaultTarget: (s) => s * 10,
     icon: "🎯",
   },
@@ -127,7 +137,7 @@ export function recommendBetSize(
       const q = 1 - p;
       const b = decimal - 1;
       const kelly = Math.max(0, (p * b - q) / b);
-      return Math.max(0.01, Math.round((current * kelly) / 4 * 100) / 100);
+      return Math.max(0.01, Math.round(((current * kelly) / 4) * 100) / 100);
     }
     case "streak": {
       return challenge.startAmount; // flat bet always

@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   CHALLENGE_PRESETS,
   type Challenge,
@@ -13,14 +14,24 @@ import {
   recommendBetSize,
   saveChallenge,
 } from "@/services/challenges";
-import { cn } from "@/lib/utils";
-import { CheckCircle, ChevronDown, ChevronUp, PlusCircle, Trophy, Trash2, XCircle } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  PlusCircle,
+  Trash2,
+  Trophy,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function fmtPct(n: number) {
@@ -112,7 +123,9 @@ function AddBetForm({ challenge, onSave, onCancel }: AddBetFormProps) {
 
   return (
     <div className="mt-3 p-3 rounded-lg bg-muted/40 border border-border/40 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Log Bet Result</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        Log Bet Result
+      </p>
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <Label className="text-xs text-muted-foreground">Description</Label>
@@ -187,8 +200,14 @@ function AddBetForm({ challenge, onSave, onCancel }: AddBetFormProps) {
         </div>
       </div>
       <div className="flex gap-2 justify-end">
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={handleSave} disabled={!desc.trim() || !Number(amount)}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={!desc.trim() || !Number(amount)}
+        >
           Save Result
         </Button>
       </div>
@@ -223,12 +242,17 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xl">{preset.icon}</span>
           <div className="min-w-0">
-            <p className="font-semibold text-foreground truncate">{challenge.name}</p>
+            <p className="font-semibold text-foreground truncate">
+              {challenge.name}
+            </p>
             <p className="text-xs text-muted-foreground">{preset.label}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Badge variant="outline" className={cn("text-[10px] font-mono uppercase", statusColor)}>
+          <Badge
+            variant="outline"
+            className={cn("text-[10px] font-mono uppercase", statusColor)}
+          >
             {challenge.status}
           </Badge>
           <button
@@ -246,16 +270,22 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
       <div className="flex items-end justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Current</p>
-          <p className="text-2xl font-bold font-mono text-foreground">${fmt(challenge.currentAmount)}</p>
+          <p className="text-2xl font-bold font-mono text-foreground">
+            ${fmt(challenge.currentAmount)}
+          </p>
         </div>
         <div className="text-right">
           {challenge.targetAmount > 0 ? (
             <>
               <p className="text-xs text-muted-foreground">Target</p>
-              <p className="text-sm font-mono text-muted-foreground">${fmt(challenge.targetAmount)}</p>
+              <p className="text-sm font-mono text-muted-foreground">
+                ${fmt(challenge.targetAmount)}
+              </p>
             </>
           ) : (
-            <p className="text-sm font-mono text-muted-foreground">Open-ended</p>
+            <p className="text-sm font-mono text-muted-foreground">
+              Open-ended
+            </p>
           )}
         </div>
       </div>
@@ -263,28 +293,43 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
       {challenge.targetAmount > 0 && (
         <div className="space-y-1">
           <ProgressBar pct={stats.progressPct} />
-          <p className="text-xs text-muted-foreground text-right">{stats.progressPct.toFixed(1)}% to goal</p>
+          <p className="text-xs text-muted-foreground text-right">
+            {stats.progressPct.toFixed(1)}% to goal
+          </p>
         </div>
       )}
 
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-2 text-center">
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">W</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            W
+          </p>
           <p className="text-sm font-semibold text-emerald-400">{stats.wins}</p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">L</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            L
+          </p>
           <p className="text-sm font-semibold text-red-400">{stats.losses}</p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ROI</p>
-          <p className={cn("text-sm font-semibold", stats.netProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            ROI
+          </p>
+          <p
+            className={cn(
+              "text-sm font-semibold",
+              stats.netProfit >= 0 ? "text-emerald-400" : "text-red-400",
+            )}
+          >
             {fmtPct(Number(stats.roi))}
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Streak</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            Streak
+          </p>
           <p className="text-sm font-semibold text-primary">{stats.streak}W</p>
         </div>
       </div>
@@ -293,7 +338,9 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
       {challenge.status === "active" && (
         <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Suggested next bet</p>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Suggested next bet
+            </p>
             <p className="text-sm font-bold text-primary">${fmt(suggested)}</p>
           </div>
           <p className="text-xs text-muted-foreground">{preset.label} sizing</p>
@@ -306,7 +353,10 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
           <Button
             size="sm"
             className="flex-1"
-            onClick={() => { setShowForm(!showForm); setShowHistory(false); }}
+            onClick={() => {
+              setShowForm(!showForm);
+              setShowHistory(false);
+            }}
           >
             <PlusCircle className="w-3.5 h-3.5 mr-1" />
             Log Result
@@ -315,9 +365,16 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}
+              onClick={() => {
+                setShowHistory(!showHistory);
+                setShowForm(false);
+              }}
             >
-              {showHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showHistory ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
               History
             </Button>
           )}
@@ -331,7 +388,11 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
           className="w-full"
           onClick={() => setShowHistory(!showHistory)}
         >
-          {showHistory ? <ChevronUp className="w-3.5 h-3.5 mr-1" /> : <ChevronDown className="w-3.5 h-3.5 mr-1" />}
+          {showHistory ? (
+            <ChevronUp className="w-3.5 h-3.5 mr-1" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 mr-1" />
+          )}
           View {challenge.bets.length} bets
         </Button>
       )}
@@ -339,16 +400,24 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
       {showForm && (
         <AddBetForm
           challenge={challenge}
-          onSave={(updated) => { onUpdate(updated); setShowForm(false); }}
+          onSave={(updated) => {
+            onUpdate(updated);
+            setShowForm(false);
+          }}
           onCancel={() => setShowForm(false)}
         />
       )}
 
       {showHistory && challenge.bets.length > 0 && (
         <div className="space-y-1.5 mt-1">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Bet History</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Bet History
+          </p>
           {[...challenge.bets].reverse().map((bet) => (
-            <div key={bet.id} className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0">
+            <div
+              key={bet.id}
+              className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0"
+            >
               {bet.result === "won" ? (
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               ) : bet.result === "lost" ? (
@@ -357,10 +426,19 @@ function ChallengeCard({ challenge, onUpdate, onDelete }: ChallengeCardProps) {
                 <span className="w-3.5 h-3.5 rounded-full border border-border shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-foreground truncate">{bet.description}</p>
-                <p className="text-[10px] text-muted-foreground">{bet.date} · ${fmt(bet.amountBet)} @ {bet.americanOdds}</p>
+                <p className="text-xs text-foreground truncate">
+                  {bet.description}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {bet.date} · ${fmt(bet.amountBet)} @ {bet.americanOdds}
+                </p>
               </div>
-              <p className={cn("text-xs font-mono font-semibold shrink-0", bet.netAmount >= 0 ? "text-emerald-400" : "text-red-400")}>
+              <p
+                className={cn(
+                  "text-xs font-mono font-semibold shrink-0",
+                  bet.netAmount >= 0 ? "text-emerald-400" : "text-red-400",
+                )}
+              >
                 {bet.netAmount >= 0 ? "+" : ""}${fmt(bet.netAmount)}
               </p>
             </div>
@@ -405,21 +483,43 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      role="presentation"
+    >
       <div
         className="w-full max-w-md bg-card rounded-xl border border-border/60 p-5 space-y-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        aria-label="New Challenge"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-bold">New Challenge</h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
         {/* Type selector */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Challenge Type</Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            Challenge Type
+          </Label>
           <div className="grid grid-cols-1 gap-1.5">
-            {(Object.entries(CHALLENGE_PRESETS) as [ChallengeType, typeof CHALLENGE_PRESETS[ChallengeType]][]).map(([key, p]) => (
+            {(
+              Object.entries(CHALLENGE_PRESETS) as [
+                ChallengeType,
+                (typeof CHALLENGE_PRESETS)[ChallengeType],
+              ][]
+            ).map(([key, p]) => (
               <button
                 key={key}
                 type="button"
@@ -434,7 +534,9 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
                 <span className="text-2xl">{p.icon}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{p.label}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{p.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {p.description}
+                  </p>
                 </div>
               </button>
             ))}
@@ -442,7 +544,9 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Challenge Name (optional)</Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            Challenge Name (optional)
+          </Label>
           <Input
             className="h-9"
             placeholder={preset.label}
@@ -452,7 +556,9 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Starting Amount ($)</Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            Starting Amount ($)
+          </Label>
           <Input
             className="h-9"
             type="number"
@@ -463,14 +569,23 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
           />
           {preset.defaultTarget(startAmount) > 0 && (
             <p className="text-xs text-muted-foreground">
-              Target: <span className="text-primary font-semibold">${fmt(preset.defaultTarget(startAmount))}</span>
+              Target:{" "}
+              <span className="text-primary font-semibold">
+                ${fmt(preset.defaultTarget(startAmount))}
+              </span>
             </p>
           )}
         </div>
 
         <div className="flex gap-2 pt-1">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button className="flex-1" onClick={handleCreate} disabled={startAmount <= 0}>
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleCreate}
+            disabled={startAmount <= 0}
+          >
             <Trophy className="w-3.5 h-3.5 mr-1.5" />
             Start Challenge
           </Button>
@@ -483,7 +598,9 @@ function NewChallengeModal({ onClose, onCreated }: NewChallengeModalProps) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ChallengesPage() {
-  const [challenges, setChallenges] = useState<Challenge[]>(() => getChallenges());
+  const [challenges, setChallenges] = useState<Challenge[]>(() =>
+    getChallenges(),
+  );
   const [showNew, setShowNew] = useState(false);
 
   function refresh() {
@@ -513,7 +630,8 @@ export default function ChallengesPage() {
             Challenges
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track bankroll growth challenges with automatic bet sizing suggestions.
+            Track bankroll growth challenges with automatic bet sizing
+            suggestions.
           </p>
         </div>
         <Button onClick={() => setShowNew(true)}>
@@ -526,10 +644,12 @@ export default function ChallengesPage() {
       {active.length === 0 && finished.length === 0 && (
         <div className="text-center py-16 space-y-3">
           <p className="text-5xl">🏆</p>
-          <p className="text-lg font-semibold text-foreground">No challenges yet</p>
+          <p className="text-lg font-semibold text-foreground">
+            No challenges yet
+          </p>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Start a challenge to track your bankroll growth with guided bet sizing.
-            Try the $10 to $10K classic or build a win streak.
+            Start a challenge to track your bankroll growth with guided bet
+            sizing. Try the $10 to $10K classic or build a win streak.
           </p>
           <Button onClick={() => setShowNew(true)} className="mt-2">
             <PlusCircle className="w-4 h-4 mr-1.5" />
@@ -545,7 +665,12 @@ export default function ChallengesPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {active.map((c) => (
-              <ChallengeCard key={c.id} challenge={c} onUpdate={handleUpdate} onDelete={handleDelete} />
+              <ChallengeCard
+                key={c.id}
+                challenge={c}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         </div>
@@ -558,13 +683,23 @@ export default function ChallengesPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 opacity-70">
             {finished.map((c) => (
-              <ChallengeCard key={c.id} challenge={c} onUpdate={handleUpdate} onDelete={handleDelete} />
+              <ChallengeCard
+                key={c.id}
+                challenge={c}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {showNew && <NewChallengeModal onClose={() => setShowNew(false)} onCreated={refresh} />}
+      {showNew && (
+        <NewChallengeModal
+          onClose={() => setShowNew(false)}
+          onCreated={refresh}
+        />
+      )}
     </div>
   );
 }
