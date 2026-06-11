@@ -150,14 +150,14 @@ function ConfidenceMeter({ score }: { score: bigint }) {
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
 
-function StatsBar() {
+function StatsBar({ hiddenCount }: { hiddenCount: number }) {
   const { data: stats, isLoading } = useBetHistoryStats();
 
   const statItems = stats
     ? [
         {
           label: "Total Bets",
-          value: String(stats.totalBets),
+          value: String(Math.max(0, Number(stats.totalBets) - hiddenCount)),
           icon: Target,
           color: "text-foreground",
         },
@@ -175,7 +175,7 @@ function StatsBar() {
         },
         {
           label: "Pending",
-          value: String(stats.pendingBets),
+          value: String(Math.max(0, Number(stats.pendingBets) - hiddenCount)),
           icon: Activity,
           color: "text-accent",
         },
@@ -867,7 +867,7 @@ export default function HistoryPage() {
       {showLogForm && <LogPastBetForm onClose={() => setShowLogForm(false)} />}
 
       {/* Stats */}
-      <StatsBar />
+      <StatsBar hiddenCount={hidden.length} />
 
       {/* Filter tabs */}
       <div

@@ -1,9 +1,8 @@
 name: Auto-merge Claude branch
 
 # When Claude Code pushes to any claude/* branch, open a PR into main
-# (if one isn't already open) and enable auto-merge. With --auto, GitHub
-# merges immediately if there are no required checks, or waits for checks
-# to pass if any are added later — so this never silently breaks.
+# (if one isn't already open) and merge it immediately.
+# No branch protection rules needed — merges directly.
 
 on:
   push:
@@ -30,10 +29,10 @@ jobs:
             --repo "${{ github.repository }}" \
           || echo "PR already exists — continuing."
 
-      - name: Enable auto-merge
+      - name: Merge PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_URL=$(gh pr view "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" --json url -q .url)
-          gh pr merge "$PR_URL" --auto --merge
+          gh pr merge "$PR_URL" --merge --delete-branch=false
