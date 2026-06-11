@@ -26,7 +26,9 @@ import { useEffect, useRef, useState } from "react";
 // ── Kelly Criterion bet sizing ────────────────────────────────────────────────
 // Returns recommended bet as % of bankroll (quarter-Kelly, standard safe sizing)
 function kellySize(confidencePct: number, americanOdds = -110): number {
-  const p = confidencePct / 100;
+  // Signal confidence is not a calibrated win probability. Shrink it toward
+  // 50% before Kelly and cap exposure so small bankrolls survive model error.
+  const p = (50 + (confidencePct - 50) * 0.5) / 100;
   const decimal =
     americanOdds < 0
       ? 100 / Math.abs(americanOdds) + 1
@@ -34,7 +36,7 @@ function kellySize(confidencePct: number, americanOdds = -110): number {
   const q = 1 - p;
   const b = decimal - 1;
   const kelly = (p * b - q) / b;
-  const quarterKelly = Math.max(0, kelly / 4);
+  const quarterKelly = Math.min(0.02, Math.max(0, kelly / 4));
   return Math.round(quarterKelly * 100 * 10) / 10; // as % of bankroll
 }
 
@@ -98,7 +100,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
     "idle",
   );
 
-  const kellySuggest = kellySize(play.confidence);
+  const kellySuggest = kellySize(play.confidence, play.price ?? -110);
   const bankroll = Number(localStorage.getItem("bankroll") ?? "100");
   const kellyDollars = Math.round((kellySuggest / 100) * bankroll * 100) / 100;
 
@@ -221,7 +223,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           </div>
           <div className="text-right">
             <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50 flex items-center">
-              Quarter-Kelly formula
+              Uncertainty-adjusted quarter-Kelly
               <GlossaryTip term="quarter-kelly" />
             </p>
             <p className="text-[10px] font-mono text-muted-foreground/60">

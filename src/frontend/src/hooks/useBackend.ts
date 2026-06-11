@@ -112,14 +112,14 @@ export function useGameDetail(gameId: string, gameDate = "") {
   });
 }
 
-export function usePlayerProps(gameId: string, enabled = true) {
+export function usePlayerProps(gameId: string, enabled = true, gameDate = "") {
   return useQuery<PlayerPropsAnalysis | null>({
-    queryKey: ["player-props", gameId],
+    queryKey: ["player-props", gameId, gameDate],
     queryFn: async () => {
       if (!gameId) return null;
       // Always resolves within a bounded time (see fetchActivePlayersForGame),
       // returning an empty analysis rather than hanging.
-      return fetchActivePlayersForGame(gameId);
+      return fetchActivePlayersForGame(gameId, gameDate);
     },
     enabled: !!gameId && enabled,
     // The fetch already bounds its own time and never rejects, so a single
@@ -457,6 +457,7 @@ export interface AnyPlay {
   betText: string;
   betType: "spread" | "total" | "moneyline";
   postedLine: number | null; // the actual number to bet (spread/total)
+  price: number | null; // American odds used for bankroll sizing
   direction: "OVER" | "UNDER" | "HOME" | "AWAY";
   confidence: number;
   convergenceCount: number;
@@ -673,6 +674,18 @@ export function usePlays() {
                   ? (parsedOdds?.homeSpread ?? null)
                   : (parsedOdds?.awaySpread ?? null)
                 : null;
+          const nbaPrice =
+            nbaBetType === "total"
+              ? rec === "OVER"
+                ? (parsedOdds?.overOdds ?? null)
+                : (parsedOdds?.underOdds ?? null)
+              : nbaBetType === "spread"
+                ? rec === "HOME"
+                  ? (parsedOdds?.homeSpreadOdds ?? null)
+                  : (parsedOdds?.awaySpreadOdds ?? null)
+                : rec === "HOME"
+                  ? (parsedOdds?.homeML ?? null)
+                  : (parsedOdds?.awayML ?? null);
 
           nbaPlays.push({
             sport: "NBA",
@@ -682,6 +695,7 @@ export function usePlays() {
             betText,
             betType: nbaBetType,
             postedLine: nbaPostedLine,
+            price: nbaPrice,
             direction: rec,
             confidence,
             convergenceCount: topCount,
@@ -844,6 +858,14 @@ export function usePlays() {
             betText,
             betType: mlbBetType,
             postedLine: mlbBetType === "total" ? mlbTotal : null,
+            price:
+              mlbBetType === "total"
+                ? topDir === "OVER"
+                  ? (mlbParsedOdds?.overOdds ?? null)
+                  : (mlbParsedOdds?.underOdds ?? null)
+                : topDir === "HOME"
+                  ? (mlbParsedOdds?.homeML ?? null)
+                  : (mlbParsedOdds?.awayML ?? null),
             direction: topDir as "OVER" | "UNDER" | "HOME" | "AWAY",
             confidence,
             convergenceCount: topCount,

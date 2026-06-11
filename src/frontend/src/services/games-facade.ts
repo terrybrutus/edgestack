@@ -302,6 +302,7 @@ const MAX_ENRICHED_PLAYERS = 12; // cap serial BDL season-average enrichment
 // terminal "no prop lines" state instead of an endless skeleton.
 export async function fetchActivePlayersForGame(
   gameId: string,
+  gameDate = "",
 ): Promise<PlayerPropsAnalysis> {
   const empty: PlayerPropsAnalysis = {
     gameId,
@@ -309,7 +310,7 @@ export async function fetchActivePlayersForGame(
     analysisGeneratedAt: new Date().toISOString(),
   };
   return withTimeout(
-    fetchActivePlayersForGameInner(gameId).catch(() => empty),
+    fetchActivePlayersForGameInner(gameId, gameDate).catch(() => empty),
     PROPS_FETCH_TIMEOUT_MS,
     empty,
   );
@@ -317,6 +318,7 @@ export async function fetchActivePlayersForGame(
 
 async function fetchActivePlayersForGameInner(
   gameId: string,
+  gameDate: string,
 ): Promise<PlayerPropsAnalysis> {
   const emptyResult: PlayerPropsAnalysis = {
     gameId,
@@ -324,13 +326,23 @@ async function fetchActivePlayersForGameInner(
     analysisGeneratedAt: new Date().toISOString(),
   };
 
-  // Locate the game — check today first, then the next 2 days (the game list
-  // hook surfaces upcoming dates, so a "today" lookup can legitimately miss).
-  const candidateDates = [0, 1, 2].map((offset) =>
-    new Date(Date.now() + offset * 86400000).toLocaleDateString("en-CA", {
-      timeZone: "America/New_York",
-    }),
-  );
+  // Locate the game around the date opened in the investigation view.
+  const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(gameDate)
+    ? gameDate
+    : new Date().toLocaleDateString("en-CA", {
+        timeZone: "America/New_York",
+      });
+  const requestedAtNoon = new Date(`${requestedDate}T12:00:00`);
+  const candidateDates = [
+    ...new Set(
+      [-1, 0, 1, 2].map((offset) => {
+        const date = new Date(requestedAtNoon.getTime() + offset * 86400000);
+        return date.toLocaleDateString("en-CA", {
+          timeZone: "America/New_York",
+        });
+      }),
+    ),
+  ];
   let bdlGame: BdlGame | undefined;
   for (const date of candidateDates) {
     const games = await fetchGamesForDate(date).catch(() => []);
@@ -356,8 +368,10 @@ async function fetchActivePlayersForGameInner(
   // If the Odds API returned prop lines, use those player names as the primary
   // roster — they're guaranteed to be current-season players with active lines.
   // Merge in BDL players for stat enrichment only.
-  const oddsPlayerNames = new Set(
-    oddsProps.map((op) => op.playerName.toLowerCase()),
+  const oddsPlayerLastNames = new Set(
+    oddsProps.map(
+      (op) => op.playerName.toLowerCase().trim().split(/\s+/).pop() ?? "",
+    ),
   );
 
   // Build a lookup from last name → BDL player (for stat enrichment)
@@ -366,10 +380,13 @@ async function fetchActivePlayersForGameInner(
   );
 
   // Fetch season averages for BDL players we actually found
-  const enrichablePlayers = [...homePlayers, ...awayPlayers].slice(
-    0,
-    MAX_ENRICHED_PLAYERS,
-  );
+  const enrichablePlayers = [...homePlayers, ...awayPlayers]
+    .sort(
+      (a, b) =>
+        Number(oddsPlayerLastNames.has(b.last_name.toLowerCase())) -
+        Number(oddsPlayerLastNames.has(a.last_name.toLowerCase())),
+    )
+    .slice(0, MAX_ENRICHED_PLAYERS);
   const playerIds = enrichablePlayers.map((p) => p.id);
   const avgs =
     playerIds.length > 0
@@ -388,6 +405,7 @@ async function fetchActivePlayersForGameInner(
     const lines = oddsProps
       .filter((op) => op.playerName === name)
       .map((op) => ({
+        market: op.market,
         bookmaker: op.bookmaker,
         line: op.line,
         overOdds: BigInt(op.overOdds),
@@ -415,7 +433,7 @@ async function fetchActivePlayersForGameInner(
   // Also include BDL players with real stats (pts > 0) who weren't in the Odds
   // lines — so the tab shows a fuller roster picture even without prop lines.
   const bdlOnlyPlayers = enrichablePlayers
-    .filter((p) => !oddsPlayerNames.has(p.last_name.toLowerCase()))
+    .filter((p) => !oddsPlayerLastNames.has(p.last_name.toLowerCase()))
     .map((p) => {
       const avg = avgByPlayerId.get(p.id);
       if (!avg || avg.pts === 0) return null; // skip zero-stat / historical players

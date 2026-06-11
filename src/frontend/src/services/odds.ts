@@ -169,11 +169,14 @@ export async function fetchPlayerPropsFromOdds(
   const homeLast = lastWord(homeTeam);
   const awayLast = lastWord(awayTeam);
 
-  const event = events.find(
-    (e) =>
-      e.home_team.toLowerCase().includes(homeLast) ||
-      e.away_team.toLowerCase().includes(awayLast),
-  );
+  const event = events.find((e) => {
+    const eventHome = e.home_team.toLowerCase();
+    const eventAway = e.away_team.toLowerCase();
+    return (
+      (eventHome.includes(homeLast) && eventAway.includes(awayLast)) ||
+      (eventHome.includes(awayLast) && eventAway.includes(homeLast))
+    );
+  });
 
   if (!event) return [];
 
@@ -207,14 +210,11 @@ export async function fetchPlayerPropsFromOdds(
     player_assists: "assists",
   };
 
-  // Deduplicate by playerName+market — prefer first (FanDuel)
+  // Keep one line per player, market, and book for line shopping.
   const seen = new Set<string>();
   const results: OddsPlayerProp[] = [];
 
   for (const bm of sorted) {
-    // Only use FanDuel or DraftKings
-    if (!PREFERRED.includes(bm.key)) continue;
-
     for (const market of bm.markets) {
       const marketType = marketKeyMap[market.key];
       if (!marketType) continue;
@@ -234,7 +234,7 @@ export async function fetchPlayerPropsFromOdds(
 
       for (const [playerName, { over, under }] of byPlayer) {
         if (!over || !under || over.point === undefined) continue;
-        const dedupeKey = `${playerName}|${marketType}`;
+        const dedupeKey = `${playerName}|${marketType}|${bm.key}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
@@ -244,7 +244,7 @@ export async function fetchPlayerPropsFromOdds(
           line: over.point,
           overOdds: over.price,
           underOdds: under.price,
-          bookmaker: bm.key,
+          bookmaker: bm.title,
         });
       }
     }

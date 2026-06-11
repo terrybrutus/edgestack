@@ -148,6 +148,7 @@ export interface Player {
 }
 
 export interface PropLine {
+  market: "points" | "rebounds" | "assists";
   overOdds: bigint;
   line: number;
   bookmaker: string;
