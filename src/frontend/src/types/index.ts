@@ -148,6 +148,7 @@ export interface Player {
 }
 
 export interface PropLine {
+  market: "points" | "rebounds" | "assists";
   overOdds: bigint;
   line: number;
   bookmaker: string;
@@ -189,6 +190,7 @@ export interface PlayerPropsAnalysis {
   gameId: GameId;
   players: Array<PlayerProp>;
   analysisGeneratedAt: string;
+  dataNotes?: Array<string>;
 }
 
 export interface PaceProfile {

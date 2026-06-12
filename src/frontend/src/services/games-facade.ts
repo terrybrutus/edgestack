@@ -32,7 +32,7 @@ import {
   fetchTeamLastNGames,
   parseBdlStatus,
 } from "./bdl";
-import { fetchOdds, parseOddsEvent } from "./odds";
+import { fetchOdds, findMatchingOddsEvent, parseOddsEvent } from "./odds";
 
 // Re-export so hooks can import from one place
 export { fetchGamesForDate, fetchTeamLastNGames };
@@ -115,14 +115,11 @@ export async function buildInvestigationFromBdl(
   const odds = oddsEvents.status === "fulfilled" ? oddsEvents.value : [];
 
   // 3. Find matching odds event
-  const oddsEvent = odds.find(
-    (e) =>
-      e.home_team
-        .toLowerCase()
-        .includes(bdlGame.home_team.name.toLowerCase()) ||
-      e.away_team
-        .toLowerCase()
-        .includes(bdlGame.visitor_team.name.toLowerCase()),
+  const oddsEvent = findMatchingOddsEvent(
+    odds,
+    bdlGame.home_team.name,
+    bdlGame.visitor_team.name,
+    bdlGame.status,
   );
   const parsedOdds = oddsEvent ? parseOddsEvent(oddsEvent) : null;
 
@@ -302,14 +299,16 @@ const MAX_ENRICHED_PLAYERS = 12; // cap serial BDL season-average enrichment
 // terminal "no prop lines" state instead of an endless skeleton.
 export async function fetchActivePlayersForGame(
   gameId: string,
+  gameDate = "",
 ): Promise<PlayerPropsAnalysis> {
   const empty: PlayerPropsAnalysis = {
     gameId,
     players: [],
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: ["Player props request timed out or failed before completion."],
   };
   return withTimeout(
-    fetchActivePlayersForGameInner(gameId).catch(() => empty),
+    fetchActivePlayersForGameInner(gameId, gameDate).catch(() => empty),
     PROPS_FETCH_TIMEOUT_MS,
     empty,
   );
@@ -317,47 +316,77 @@ export async function fetchActivePlayersForGame(
 
 async function fetchActivePlayersForGameInner(
   gameId: string,
+  gameDate: string,
 ): Promise<PlayerPropsAnalysis> {
   const emptyResult: PlayerPropsAnalysis = {
     gameId,
     players: [],
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: [],
   };
 
-  // Locate the game — check today first, then the next 2 days (the game list
-  // hook surfaces upcoming dates, so a "today" lookup can legitimately miss).
-  const candidateDates = [0, 1, 2].map((offset) =>
-    new Date(Date.now() + offset * 86400000).toLocaleDateString("en-CA", {
-      timeZone: "America/New_York",
-    }),
-  );
+  // Locate the game around the date opened in the investigation view.
+  const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(gameDate)
+    ? gameDate
+    : new Date().toLocaleDateString("en-CA", {
+        timeZone: "America/New_York",
+      });
+  const requestedAtNoon = new Date(`${requestedDate}T12:00:00`);
+  const candidateDates = [
+    ...new Set(
+      [-1, 0, 1, 2].map((offset) => {
+        const date = new Date(requestedAtNoon.getTime() + offset * 86400000);
+        return date.toLocaleDateString("en-CA", {
+          timeZone: "America/New_York",
+        });
+      }),
+    ),
+  ];
   let bdlGame: BdlGame | undefined;
   for (const date of candidateDates) {
     const games = await fetchGamesForDate(date).catch(() => []);
     bdlGame = games.find((g) => String(g.id) === gameId);
     if (bdlGame) break;
   }
-  if (!bdlGame) return emptyResult;
+  if (!bdlGame) {
+    return {
+      ...emptyResult,
+      dataNotes: ["Game could not be matched to the roster/stat provider."],
+    };
+  }
 
   const season = bdlGame.season;
 
   // Fetch prop lines from Odds API first (single fast request — this is the
   // primary data source for betting decisions).
   const { fetchPlayerPropsFromOdds } = await import("./odds");
-  const [homePlayers, awayPlayers, oddsProps] = await Promise.all([
+  const [homePlayers, awayPlayers, oddsPropsResult] = await Promise.all([
     fetchActivePlayers(bdlGame.home_team.id, season).catch(() => []),
     fetchActivePlayers(bdlGame.visitor_team.id, season).catch(() => []),
     fetchPlayerPropsFromOdds(
       bdlGame.home_team.name,
       bdlGame.visitor_team.name,
-    ).catch(() => []),
+      "basketball_nba",
+      bdlGame.status,
+    )
+      .then((props) => ({ props, note: "" }))
+      .catch((error: unknown) => ({
+        props: [],
+        note:
+          error instanceof Error
+            ? error.message
+            : "Player props provider returned no usable data.",
+      })),
   ]);
+  const oddsProps = oddsPropsResult.props;
 
   // If the Odds API returned prop lines, use those player names as the primary
   // roster — they're guaranteed to be current-season players with active lines.
   // Merge in BDL players for stat enrichment only.
-  const oddsPlayerNames = new Set(
-    oddsProps.map((op) => op.playerName.toLowerCase()),
+  const oddsPlayerLastNames = new Set(
+    oddsProps.map(
+      (op) => op.playerName.toLowerCase().trim().split(/\s+/).pop() ?? "",
+    ),
   );
 
   // Build a lookup from last name → BDL player (for stat enrichment)
@@ -366,10 +395,13 @@ async function fetchActivePlayersForGameInner(
   );
 
   // Fetch season averages for BDL players we actually found
-  const enrichablePlayers = [...homePlayers, ...awayPlayers].slice(
-    0,
-    MAX_ENRICHED_PLAYERS,
-  );
+  const enrichablePlayers = [...homePlayers, ...awayPlayers]
+    .sort(
+      (a, b) =>
+        Number(oddsPlayerLastNames.has(b.last_name.toLowerCase())) -
+        Number(oddsPlayerLastNames.has(a.last_name.toLowerCase())),
+    )
+    .slice(0, MAX_ENRICHED_PLAYERS);
   const playerIds = enrichablePlayers.map((p) => p.id);
   const avgs =
     playerIds.length > 0
@@ -388,6 +420,7 @@ async function fetchActivePlayersForGameInner(
     const lines = oddsProps
       .filter((op) => op.playerName === name)
       .map((op) => ({
+        market: op.market,
         bookmaker: op.bookmaker,
         line: op.line,
         overOdds: BigInt(op.overOdds),
@@ -415,7 +448,7 @@ async function fetchActivePlayersForGameInner(
   // Also include BDL players with real stats (pts > 0) who weren't in the Odds
   // lines — so the tab shows a fuller roster picture even without prop lines.
   const bdlOnlyPlayers = enrichablePlayers
-    .filter((p) => !oddsPlayerNames.has(p.last_name.toLowerCase()))
+    .filter((p) => !oddsPlayerLastNames.has(p.last_name.toLowerCase()))
     .map((p) => {
       const avg = avgByPlayerId.get(p.id);
       if (!avg || avg.pts === 0) return null; // skip zero-stat / historical players
@@ -445,6 +478,7 @@ async function fetchActivePlayersForGameInner(
     gameId,
     players,
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: oddsPropsResult.note ? [oddsPropsResult.note] : [],
   };
 }
 

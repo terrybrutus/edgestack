@@ -227,36 +227,21 @@ function PropLinesRow({
   playerName,
 }: { lines: PropLine[]; playerName: string }) {
   if (!lines.length) return null;
-  const vals = lines.map((l) => l.line);
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
-  const hasDisc = max - min >= 0.5;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
           Prop Lines
         </span>
-        {hasDisc && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border border-accent/50 text-accent bg-accent/10">
-            <AlertTriangle className="w-2.5 h-2.5" />
-            {(max - min).toFixed(1)} gap
-          </span>
-        )}
       </div>
       <div className="flex flex-wrap gap-2">
         {lines.map((line) => (
           <div
-            key={line.bookmaker}
-            className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-mono",
-              (line.line === max && hasDisc) || (line.line === min && hasDisc)
-                ? "border-accent/50 bg-accent/10 text-accent"
-                : "border-border/50 bg-card/60 text-foreground",
-            )}
+            key={`${line.market}-${line.bookmaker}`}
+            className="flex items-center gap-1.5 px-2 py-1 rounded border border-border/50 bg-card/60 text-xs font-mono text-foreground"
           >
             <span className="text-muted-foreground uppercase">
-              {line.bookmaker}
+              {line.market} · {line.bookmaker}
             </span>
             <span className="font-bold">{line.line}</span>
             <span className="text-muted-foreground text-[10px]">
@@ -267,7 +252,7 @@ function PropLinesRow({
         ))}
       </div>
       <p className="text-[10px] font-mono text-muted-foreground">
-        Lines shown for {playerName} — O/U points prop
+        Live O/U markets shown for {playerName}
       </p>
     </div>
   );
@@ -458,10 +443,12 @@ function PlayerPropCard({ prop, index }: { prop: PlayerProp; index: number }) {
 // ─── Player Props Tab ─────────────────────────────────────────────────────────
 function PlayerPropsTab({
   gameId,
+  gameDate,
   injuries,
   isActiveTab,
 }: {
   gameId: string;
+  gameDate: string;
   injuries: GameInvestigation["injuries"];
   isActiveTab: boolean;
 }) {
@@ -470,6 +457,7 @@ function PlayerPropsTab({
   const { data, isLoading, isError, refetch } = usePlayerProps(
     gameId,
     shouldFetch,
+    gameDate,
   );
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const propsAI = usePropsAIAnalysis();
@@ -625,6 +613,14 @@ function PlayerPropsTab({
             No prop lines available for this game. Try opening a game closer to
             tip-off — lines appear 1-2 hours before game time.
           </p>
+          {(propsData?.dataNotes ?? []).map((note) => (
+            <p
+              key={note}
+              className="text-[11px] font-mono text-accent text-center max-w-md"
+            >
+              Data source: {note}
+            </p>
+          ))}
         </div>
       )}
 
@@ -1932,7 +1928,7 @@ export default function InvestigationPage() {
   } = useGameDetail(gameId, gameDate ?? "");
   const [activeTab, setActiveTab] = useState<TabId>("props");
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
-  const { data: propsData } = usePlayerProps(gameId, true);
+  const { data: propsData } = usePlayerProps(gameId, true, gameDate ?? "");
   const hasLiveProps =
     (propsData as PlayerPropsAnalysis | undefined)?.players.some(
       (p) => p.propLines.length > 0,
@@ -2191,6 +2187,7 @@ export default function InvestigationPage() {
         {activeTab === "props" && (
           <PlayerPropsTab
             gameId={gameId}
+            gameDate={gameDate ?? ""}
             injuries={injuries}
             isActiveTab={activeTab === "props"}
           />
