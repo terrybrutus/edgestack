@@ -453,6 +453,7 @@ export interface AnyPlay {
   sport: "NBA" | "MLB";
   gameLabel: string;
   gameId: string;
+  gameDate: string;
   displayTime: string;
   betText: string;
   betType: "spread" | "total" | "moneyline";
@@ -468,19 +469,29 @@ export interface AnyPlay {
   linkSearch?: Record<string, string>;
 }
 
+export interface PlaysResult {
+  nbaPlays: AnyPlay[];
+  mlbPlays: AnyPlay[];
+  diagnostics: string[];
+}
+
 export function usePlays() {
-  return useQuery<{ nbaPlays: AnyPlay[]; mlbPlays: AnyPlay[] }>({
-    queryKey: ["plays-today"],
+  const playsDate = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+  return useQuery<PlaysResult>({
+    queryKey: ["plays", playsDate],
     queryFn: async () => {
-      const today = new Date().toLocaleDateString("en-CA", {
-        timeZone: "America/New_York",
-      });
+      const today = playsDate;
+      const diagnostics: string[] = [];
 
       // ── NBA plays ───────────────────────────────────────────────────────────
       const { analyzeNbaEdge } = await import("@/services/analysis");
       const { fetchGamesForDate, fetchTeamLastNGames, computeRestDays } =
         await import("@/services/games-facade");
-      const { fetchOdds, parseOddsEvent } = await import("@/services/odds");
+      const { fetchOdds, findMatchingOddsEvent, parseOddsEvent } = await import(
+        "@/services/odds"
+      );
 
       const [bdlGames, nbaOdds] = await Promise.allSettled([
         fetchGamesForDate(today),
@@ -488,6 +499,12 @@ export function usePlays() {
       ]);
       const games = bdlGames.status === "fulfilled" ? bdlGames.value : [];
       const oddsEvents = nbaOdds.status === "fulfilled" ? nbaOdds.value : [];
+      if (bdlGames.status === "rejected") {
+        diagnostics.push("NBA schedule provider failed.");
+      }
+      if (nbaOdds.status === "rejected") {
+        diagnostics.push("NBA sportsbook feed failed.");
+      }
 
       const nbaPlays: AnyPlay[] = [];
 
@@ -506,14 +523,11 @@ export function usePlays() {
           const homeRestDays = computeRestDays(homeRecent, today);
           const awayRestDays = computeRestDays(awayRecent, today);
 
-          const oddsEvent = oddsEvents.find(
-            (e) =>
-              e.home_team
-                .toLowerCase()
-                .includes(g.home_team.name.toLowerCase()) ||
-              e.away_team
-                .toLowerCase()
-                .includes(g.visitor_team.name.toLowerCase()),
+          const oddsEvent = findMatchingOddsEvent(
+            oddsEvents,
+            g.home_team.name,
+            g.visitor_team.name,
+            g.status,
           );
           const parsedOdds = oddsEvent ? parseOddsEvent(oddsEvent) : null;
 
@@ -691,6 +705,7 @@ export function usePlays() {
             sport: "NBA",
             gameLabel: `${g.visitor_team.abbreviation} @ ${g.home_team.abbreviation}`,
             gameId: String(g.id),
+            gameDate: today,
             displayTime,
             betText,
             betType: nbaBetType,
@@ -727,6 +742,12 @@ export function usePlays() {
         mlbGamesRaw.status === "fulfilled" ? mlbGamesRaw.value : [];
       const mlbOddsEvents =
         mlbOddsResult.status === "fulfilled" ? mlbOddsResult.value : [];
+      if (mlbGamesRaw.status === "rejected") {
+        diagnostics.push("MLB schedule provider failed.");
+      }
+      if (mlbOddsResult.status === "rejected") {
+        diagnostics.push("MLB sportsbook feed failed.");
+      }
       const mlbPlays: AnyPlay[] = [];
 
       await Promise.all(
@@ -736,18 +757,11 @@ export function usePlays() {
           const park = getPF(venueName);
 
           // Find matching odds event for this MLB game
-          const mlbOddsEvent = mlbOddsEvents.find(
-            (e) =>
-              e.home_team
-                .toLowerCase()
-                .includes(
-                  g.teams.home.team.name.toLowerCase().split(" ").pop() ?? "",
-                ) ||
-              e.away_team
-                .toLowerCase()
-                .includes(
-                  g.teams.away.team.name.toLowerCase().split(" ").pop() ?? "",
-                ),
+          const mlbOddsEvent = findMatchingOddsEvent(
+            mlbOddsEvents,
+            g.teams.home.team.name,
+            g.teams.away.team.name,
+            g.gameDate,
           );
           const mlbParsedOdds = mlbOddsEvent
             ? parseOddsEvent(mlbOddsEvent)
@@ -804,12 +818,65 @@ export function usePlays() {
 
           if (homeEra !== null && awayEra !== null) {
             const eraDiff = awayEra - homeEra;
+            const starterAverage = (homeEra + awayEra) / 2;
+            if (starterAverage >= 4.5 || starterAverage <= 3.25) {
+              signals.push({
+                name: "Starting Pitching Total",
+                description: `Probable starters average ${starterAverage.toFixed(2)} ERA (${awayEra.toFixed(2)} vs ${homeEra.toFixed(2)})`,
+                confidence: starterAverage >= 5 || starterAverage <= 2.8 ? 65 : 59,
+                direction: starterAverage >= 4.5 ? "OVER" : "UNDER",
+              });
+            }
             if (Math.abs(eraDiff) >= 1.0) {
               signals.push({
                 name: "Pitcher Matchup",
                 description: `ERA advantage: ${eraDiff > 0 ? g.teams.home.team.name : g.teams.away.team.name} (${Math.min(homeEra, awayEra).toFixed(2)} vs ${Math.max(homeEra, awayEra).toFixed(2)})`,
                 confidence: Math.abs(eraDiff) >= 1.5 ? 68 : 58,
                 direction: eraDiff > 0 ? "HOME" : "AWAY",
+              });
+            }
+          }
+
+          if (
+            mlbParsedOdds?.overOdds !== null &&
+            mlbParsedOdds?.overOdds !== undefined &&
+            mlbParsedOdds?.underOdds !== null &&
+            mlbParsedOdds?.underOdds !== undefined
+          ) {
+            const overPressure = -mlbParsedOdds.overOdds;
+            const underPressure = -mlbParsedOdds.underOdds;
+            if (Math.max(overPressure, underPressure) >= 115) {
+              const marketDirection =
+                overPressure > underPressure ? "OVER" : "UNDER";
+              signals.push({
+                name: "Market Price",
+                description: `${marketDirection} price pressure (${mlbParsedOdds.overOdds}/${mlbParsedOdds.underOdds})`,
+                confidence: 57,
+                direction: marketDirection,
+              });
+            }
+          }
+
+          if (
+            mlbParsedOdds?.homeML !== null &&
+            mlbParsedOdds?.homeML !== undefined &&
+            mlbParsedOdds?.awayML !== null &&
+            mlbParsedOdds?.awayML !== undefined
+          ) {
+            const implied = (american: number) =>
+              american < 0
+                ? Math.abs(american) / (Math.abs(american) + 100)
+                : 100 / (american + 100);
+            const homeImplied = implied(mlbParsedOdds.homeML);
+            const awayImplied = implied(mlbParsedOdds.awayML);
+            const noVigHome = homeImplied / (homeImplied + awayImplied);
+            if (noVigHome >= 0.58 || noVigHome <= 0.42) {
+              const marketDirection = noVigHome >= 0.58 ? "HOME" : "AWAY";
+              signals.push({
+                name: "Market Price",
+                description: `${marketDirection} has ${(Math.max(noVigHome, 1 - noVigHome) * 100).toFixed(0)}% no-vig market probability`,
+                confidence: 58,
+                direction: marketDirection,
               });
             }
           }
@@ -824,6 +891,14 @@ export function usePlays() {
 
           const [topDir, topCount] = sorted[0];
           const aligned = signals.filter((s) => s.direction === topDir);
+          const hasGameSpecificSignal = aligned.some((signal) =>
+            [
+              "Pitcher Matchup",
+              "Starting Pitching Total",
+              "Market Price",
+            ].includes(signal.name),
+          );
+          if (!hasGameSpecificSignal) return;
           const avgConf =
             aligned.reduce((a, b) => a + b.confidence, 0) / aligned.length;
           const bonus = Math.min(20, (topCount - 1) * 7);
@@ -846,6 +921,9 @@ export function usePlays() {
           else betText = `${awayAbbr} ML on FanDuel`;
 
           const displayTime = mlbTime(g);
+          const mlbGameDate = new Date(g.gameDate).toLocaleDateString("en-CA", {
+            timeZone: "America/New_York",
+          });
 
           const mlbBetType: AnyPlay["betType"] =
             topDir === "OVER" || topDir === "UNDER" ? "total" : "moneyline";
@@ -854,6 +932,7 @@ export function usePlays() {
             sport: "MLB",
             gameLabel: `${awayAbbr} @ ${homeAbbr}`,
             gameId: String(g.gamePk),
+            gameDate: mlbGameDate,
             displayTime,
             betText,
             betType: mlbBetType,
@@ -881,7 +960,21 @@ export function usePlays() {
         }),
       );
 
-      return { nbaPlays, mlbPlays };
+      if (nbaPlays.length === 0 && games.length > 0) {
+        diagnostics.push(
+          `${games.length} NBA game(s) checked; none had two aligned signals.`,
+        );
+      }
+      if (mlbPlays.length === 0 && mlbGames.length > 0) {
+        diagnostics.push(
+          `${mlbGames.length} MLB game(s) checked; none had two aligned signals including a game-specific signal.`,
+        );
+      }
+      if (games.length === 0 && mlbGames.length === 0) {
+        diagnostics.push("No NBA or MLB games were returned for today.");
+      }
+
+      return { nbaPlays, mlbPlays, diagnostics };
     },
     staleTime: 10 * 60_000,
     refetchInterval: 10 * 60_000,

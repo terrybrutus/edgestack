@@ -34,6 +34,47 @@ export interface ParsedOdds {
   awayML: number | null;
 }
 
+function teamKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim()
+    .split(/\s+/)
+    .pop() ?? "";
+}
+
+export function findMatchingOddsEvent(
+  events: OddsEvent[],
+  homeTeam: string,
+  awayTeam: string,
+  targetTime?: string,
+): OddsEvent | undefined {
+  const homeKey = teamKey(homeTeam);
+  const awayKey = teamKey(awayTeam);
+  const matches = events.filter(
+    (event) =>
+      teamKey(event.home_team) === homeKey &&
+      teamKey(event.away_team) === awayKey,
+  );
+  if (!targetTime) return matches[0];
+
+  const targetMs = new Date(targetTime).getTime();
+  if (Number.isNaN(targetMs)) return matches[0];
+  const closest = [...matches].sort(
+    (a, b) =>
+      Math.abs(new Date(a.commence_time).getTime() - targetMs) -
+      Math.abs(new Date(b.commence_time).getTime() - targetMs),
+  )[0];
+  if (
+    !closest ||
+    Math.abs(new Date(closest.commence_time).getTime() - targetMs) >
+      18 * 60 * 60 * 1000
+  ) {
+    return undefined;
+  }
+  return closest;
+}
+
 export async function fetchOdds(
   sportKey: "basketball_nba" | "baseball_mlb",
   markets = "spreads,totals,h2h",
@@ -156,6 +197,7 @@ export async function fetchPlayerPropsFromOdds(
   homeTeam: string,
   awayTeam: string,
   sport = "basketball_nba",
+  targetTime = "",
 ): Promise<OddsPlayerProp[]> {
   // 1. Get all events (cached by fetchOdds internally if called before)
   const events = await fetchOdds(
@@ -163,22 +205,11 @@ export async function fetchPlayerPropsFromOdds(
     "spreads,totals,h2h",
   );
 
-  // 2. Find matching event using fuzzy last-word matching
-  const lastWord = (s: string) =>
-    s.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
-  const homeLast = lastWord(homeTeam);
-  const awayLast = lastWord(awayTeam);
-
-  const event = events.find((e) => {
-    const eventHome = e.home_team.toLowerCase();
-    const eventAway = e.away_team.toLowerCase();
-    return (
-      (eventHome.includes(homeLast) && eventAway.includes(awayLast)) ||
-      (eventHome.includes(awayLast) && eventAway.includes(homeLast))
-    );
-  });
-
-  if (!event) return [];
+  // 2. Match both teams and the specific event start time.
+  const event = findMatchingOddsEvent(events, homeTeam, awayTeam, targetTime);
+  if (!event) {
+    throw new Error("No matching sportsbook event found for this game");
+  }
 
   const cacheKey = `${event.id}`;
   const cached = propsCache.get(cacheKey);
@@ -192,7 +223,9 @@ export async function fetchPlayerPropsFromOdds(
     `?apiKey=${CONFIG.ODDS_API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`;
 
   const res = await fetch(url);
-  if (!res.ok) return [];
+  if (!res.ok) {
+    throw new Error(`Player props feed failed (${res.status})`);
+  }
 
   const propsEvent: PlayerPropsEvent = await res.json();
 
@@ -251,5 +284,8 @@ export async function fetchPlayerPropsFromOdds(
   }
 
   propsCache.set(cacheKey, { data: results, at: Date.now() });
+  if (results.length === 0) {
+    throw new Error("Sportsbooks have not posted supported player props yet");
+  }
   return results;
 }

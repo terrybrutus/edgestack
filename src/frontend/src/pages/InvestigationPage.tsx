@@ -613,6 +613,14 @@ function PlayerPropsTab({
             No prop lines available for this game. Try opening a game closer to
             tip-off — lines appear 1-2 hours before game time.
           </p>
+          {(propsData?.dataNotes ?? []).map((note) => (
+            <p
+              key={note}
+              className="text-[11px] font-mono text-accent text-center max-w-md"
+            >
+              Data source: {note}
+            </p>
+          ))}
         </div>
       )}
 

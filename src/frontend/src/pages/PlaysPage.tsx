@@ -118,7 +118,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
         gameId: play.gameId,
         homeTeam: play.gameLabel.split(" @ ")[1] ?? "",
         awayTeam: play.gameLabel.split(" @ ")[0] ?? "",
-        gameDate: new Date().toLocaleDateString("en-CA"),
+        gameDate: play.gameDate,
         description: play.betText,
         reasoning: play.summaryText,
         recommendedAt: BigInt(Date.now()),
@@ -173,7 +173,7 @@ function PlayCard({ play, index }: { play: AnyPlay; index: number }) {
           <SportBadge sport={play.sport} />
           <ConfidenceBadge value={play.confidence} />
           <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">
-            {play.gameLabel} · {play.displayTime}
+            {play.gameLabel} · {play.gameDate} · {play.displayTime}
           </span>
         </div>
 
@@ -364,7 +364,7 @@ function PlaySkeleton() {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState() {
+function EmptyState({ diagnostics }: { diagnostics: string[] }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -391,6 +391,21 @@ function EmptyState() {
         View All Games
         <ChevronRight className="w-3.5 h-3.5" />
       </Link>
+      {diagnostics.length > 0 && (
+        <div className="max-w-lg rounded-lg border border-border/40 bg-card/60 p-3 space-y-1">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            What was checked
+          </p>
+          {diagnostics.map((diagnostic) => (
+            <p
+              key={diagnostic}
+              className="text-[11px] font-mono text-muted-foreground"
+            >
+              {diagnostic}
+            </p>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -488,7 +503,9 @@ export default function PlaysPage() {
       {/* Content */}
       {!isLoading && !isError && (
         <>
-          {totalPlays === 0 && <EmptyState />}
+          {totalPlays === 0 && (
+            <EmptyState diagnostics={data?.diagnostics ?? []} />
+          )}
 
           {nbaPlays.length > 0 && (
             <section className="mb-8">

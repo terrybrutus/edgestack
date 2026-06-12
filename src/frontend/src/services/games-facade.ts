@@ -32,7 +32,7 @@ import {
   fetchTeamLastNGames,
   parseBdlStatus,
 } from "./bdl";
-import { fetchOdds, parseOddsEvent } from "./odds";
+import { fetchOdds, findMatchingOddsEvent, parseOddsEvent } from "./odds";
 
 // Re-export so hooks can import from one place
 export { fetchGamesForDate, fetchTeamLastNGames };
@@ -115,14 +115,11 @@ export async function buildInvestigationFromBdl(
   const odds = oddsEvents.status === "fulfilled" ? oddsEvents.value : [];
 
   // 3. Find matching odds event
-  const oddsEvent = odds.find(
-    (e) =>
-      e.home_team
-        .toLowerCase()
-        .includes(bdlGame.home_team.name.toLowerCase()) ||
-      e.away_team
-        .toLowerCase()
-        .includes(bdlGame.visitor_team.name.toLowerCase()),
+  const oddsEvent = findMatchingOddsEvent(
+    odds,
+    bdlGame.home_team.name,
+    bdlGame.visitor_team.name,
+    bdlGame.status,
   );
   const parsedOdds = oddsEvent ? parseOddsEvent(oddsEvent) : null;
 
@@ -308,6 +305,7 @@ export async function fetchActivePlayersForGame(
     gameId,
     players: [],
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: ["Player props request timed out or failed before completion."],
   };
   return withTimeout(
     fetchActivePlayersForGameInner(gameId, gameDate).catch(() => empty),
@@ -324,6 +322,7 @@ async function fetchActivePlayersForGameInner(
     gameId,
     players: [],
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: [],
   };
 
   // Locate the game around the date opened in the investigation view.
@@ -349,21 +348,37 @@ async function fetchActivePlayersForGameInner(
     bdlGame = games.find((g) => String(g.id) === gameId);
     if (bdlGame) break;
   }
-  if (!bdlGame) return emptyResult;
+  if (!bdlGame) {
+    return {
+      ...emptyResult,
+      dataNotes: ["Game could not be matched to the roster/stat provider."],
+    };
+  }
 
   const season = bdlGame.season;
 
   // Fetch prop lines from Odds API first (single fast request — this is the
   // primary data source for betting decisions).
   const { fetchPlayerPropsFromOdds } = await import("./odds");
-  const [homePlayers, awayPlayers, oddsProps] = await Promise.all([
+  const [homePlayers, awayPlayers, oddsPropsResult] = await Promise.all([
     fetchActivePlayers(bdlGame.home_team.id, season).catch(() => []),
     fetchActivePlayers(bdlGame.visitor_team.id, season).catch(() => []),
     fetchPlayerPropsFromOdds(
       bdlGame.home_team.name,
       bdlGame.visitor_team.name,
-    ).catch(() => []),
+      "basketball_nba",
+      bdlGame.status,
+    )
+      .then((props) => ({ props, note: "" }))
+      .catch((error: unknown) => ({
+        props: [],
+        note:
+          error instanceof Error
+            ? error.message
+            : "Player props provider returned no usable data.",
+      })),
   ]);
+  const oddsProps = oddsPropsResult.props;
 
   // If the Odds API returned prop lines, use those player names as the primary
   // roster — they're guaranteed to be current-season players with active lines.
@@ -463,6 +478,7 @@ async function fetchActivePlayersForGameInner(
     gameId,
     players,
     analysisGeneratedAt: new Date().toISOString(),
+    dataNotes: oddsPropsResult.note ? [oddsPropsResult.note] : [],
   };
 }
 

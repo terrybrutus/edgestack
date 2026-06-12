@@ -190,6 +190,7 @@ export interface PlayerPropsAnalysis {
   gameId: GameId;
   players: Array<PlayerProp>;
   analysisGeneratedAt: string;
+  dataNotes?: Array<string>;
 }
 
 export interface PaceProfile {
